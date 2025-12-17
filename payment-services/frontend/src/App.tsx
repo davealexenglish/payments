@@ -9,7 +9,7 @@ import { CreateSubscriptionDialog } from './components/dialogs/CreateSubscriptio
 import { CreateProductFamilyDialog } from './components/dialogs/CreateProductFamilyDialog'
 import { CreateProductDialog } from './components/dialogs/CreateProductDialog'
 import { ToastProvider } from './components/Toast'
-import type { ProductFamily } from './api'
+import type { ProductFamily, Customer, Product } from './api'
 import './App.css'
 
 const queryClient = new QueryClient()
@@ -37,6 +37,11 @@ function App() {
   const [showCreateProductDialog, setShowCreateProductDialog] = useState(false)
   const [createProductConnectionId, setCreateProductConnectionId] = useState<number | null>(null)
   const [createProductFamily, setCreateProductFamily] = useState<ProductFamily | null>(null)
+  // Edit states
+  const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
+  const [editCustomerConnectionId, setEditCustomerConnectionId] = useState<number | null>(null)
+  const [editProduct, setEditProduct] = useState<Product | null>(null)
+  const [editProductConnectionId, setEditProductConnectionId] = useState<number | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef<string | null>(null)
@@ -85,6 +90,18 @@ function App() {
     setShowCreateProductDialog(true)
   }, [])
 
+  const handleEditCustomer = useCallback((connectionId: number, customer: Customer) => {
+    setEditCustomerConnectionId(connectionId)
+    setEditCustomer(customer)
+    setShowCreateCustomerDialog(true)
+  }, [])
+
+  const handleEditProduct = useCallback((connectionId: number, product: Product) => {
+    setEditProductConnectionId(connectionId)
+    setEditProduct(product)
+    setShowCreateProductDialog(true)
+  }, [])
+
   const handleRefreshTree = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['tree'] })
     queryClient.invalidateQueries({ queryKey: ['connections'] })
@@ -116,6 +133,8 @@ function App() {
                 onCreateSubscription={handleCreateSubscription}
                 onCreateProductFamily={handleCreateProductFamily}
                 onCreateProduct={handleCreateProduct}
+                onEditCustomer={handleEditCustomer}
+                onEditProduct={handleEditProduct}
               />
             </div>
           </div>
@@ -148,17 +167,22 @@ function App() {
           />
         )}
 
-        {/* Create Customer Dialog */}
-        {showCreateCustomerDialog && createCustomerConnectionId && (
+        {/* Create/Edit Customer Dialog */}
+        {showCreateCustomerDialog && (createCustomerConnectionId || editCustomerConnectionId) && (
           <CreateCustomerDialog
-            connectionId={createCustomerConnectionId}
+            connectionId={(editCustomerConnectionId || createCustomerConnectionId)!}
+            customer={editCustomer || undefined}
             onClose={() => {
               setShowCreateCustomerDialog(false)
               setCreateCustomerConnectionId(null)
+              setEditCustomer(null)
+              setEditCustomerConnectionId(null)
             }}
             onSuccess={() => {
               setShowCreateCustomerDialog(false)
               setCreateCustomerConnectionId(null)
+              setEditCustomer(null)
+              setEditCustomerConnectionId(null)
               queryClient.invalidateQueries({ queryKey: ['maxio', 'customers'] })
             }}
           />
@@ -199,24 +223,30 @@ function App() {
           />
         )}
 
-        {/* Create Product Dialog */}
-        {showCreateProductDialog && createProductConnectionId && createProductFamily && (
+        {/* Create/Edit Product Dialog */}
+        {showCreateProductDialog && ((createProductConnectionId && createProductFamily) || (editProductConnectionId && editProduct)) && (
           <CreateProductDialog
-            connectionId={createProductConnectionId}
-            productFamily={createProductFamily}
+            connectionId={(editProductConnectionId || createProductConnectionId)!}
+            productFamily={createProductFamily || undefined}
+            product={editProduct || undefined}
             onClose={() => {
               setShowCreateProductDialog(false)
               setCreateProductConnectionId(null)
               setCreateProductFamily(null)
+              setEditProduct(null)
+              setEditProductConnectionId(null)
             }}
             onSuccess={() => {
               setShowCreateProductDialog(false)
               setCreateProductConnectionId(null)
-              const familyId = createProductFamily?.id
+              const familyId = createProductFamily?.id || editProduct?.product_family?.id
               setCreateProductFamily(null)
+              setEditProduct(null)
+              setEditProductConnectionId(null)
               if (familyId) {
                 queryClient.invalidateQueries({ queryKey: ['maxio', `products-${familyId}`] })
               }
+              queryClient.invalidateQueries({ queryKey: ['maxio', 'products'] })
             }}
           />
         )}

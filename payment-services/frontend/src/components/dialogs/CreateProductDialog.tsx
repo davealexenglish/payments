@@ -1,56 +1,74 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api, { type ProductFamily } from '../../api'
+import api, { type ProductFamily, type Product } from '../../api'
+import { useToast } from '../Toast'
 
 interface CreateProductDialogProps {
   connectionId: number
-  productFamily: ProductFamily
+  productFamily?: ProductFamily // Required for create mode
+  product?: Product // If provided, edit mode
   onClose: () => void
   onSuccess: () => void
 }
 
-export function CreateProductDialog({ connectionId, productFamily, onClose, onSuccess }: CreateProductDialogProps) {
-  const [name, setName] = useState('')
-  const [handle, setHandle] = useState('')
-  const [description, setDescription] = useState('')
-  const [priceInCents, setPriceInCents] = useState('')
-  const [interval, setInterval] = useState('1')
-  const [intervalUnit, setIntervalUnit] = useState('month')
-  const [error, setError] = useState<string | null>(null)
+export function CreateProductDialog({ connectionId, productFamily, product, onClose, onSuccess }: CreateProductDialogProps) {
+  const isEditMode = !!product
+  const [name, setName] = useState(product?.name || '')
+  const [handle, setHandle] = useState(product?.handle || '')
+  const [description, setDescription] = useState(product?.description || '')
+  const [priceInCents, setPriceInCents] = useState(product ? String(product.price_in_cents) : '')
+  const [interval, setInterval] = useState(product ? String(product.interval) : '1')
+  const [intervalUnit, setIntervalUnit] = useState(product?.interval_unit || 'month')
+  const { showToast } = useToast()
+
+  // Get family name for display
+  const familyName = isEditMode ? product?.product_family?.name : productFamily?.name
 
   const createMutation = useMutation({
     mutationFn: (data: { name: string; handle?: string; description?: string; price_in_cents: number; interval: number; interval_unit: string }) =>
-      api.createMaxioProduct(connectionId, productFamily.id, data),
+      api.createMaxioProduct(connectionId, productFamily!.id, data),
     onSuccess: () => {
       onSuccess()
     },
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Failed to create product')
+      showToast(err, 'error')
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: (data: { name: string; handle?: string; description?: string; price_in_cents: number; interval: number; interval_unit: string }) =>
+      api.updateMaxioProduct(connectionId, product!.id, data),
+    onSuccess: () => {
+      onSuccess()
+    },
+    onError: (err) => {
+      showToast(err, 'error')
+    },
+  })
+
+  const mutation = isEditMode ? updateMutation : createMutation
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
 
     if (!name.trim()) {
-      setError('Name is required')
+      showToast('Name is required', 'error')
       return
     }
 
     const cents = parseInt(priceInCents, 10)
     if (isNaN(cents) || cents <= 0) {
-      setError('Price must be a positive number')
+      showToast('Price must be a positive number', 'error')
       return
     }
 
     const intervalNum = parseInt(interval, 10)
     if (isNaN(intervalNum) || intervalNum <= 0) {
-      setError('Interval must be a positive number')
+      showToast('Interval must be a positive number', 'error')
       return
     }
 
-    createMutation.mutate({
+    mutation.mutate({
       name: name.trim(),
       handle: handle.trim() || undefined,
       description: description.trim() || undefined,
@@ -67,17 +85,19 @@ export function CreateProductDialog({ connectionId, productFamily, onClose, onSu
     <div className="modal-overlay">
       <div className="modal-dialog">
         <div className="modal-header">
-          Create Product
+          {isEditMode ? 'Edit Product' : 'Create Product'}
           <button className="modal-close" onClick={onClose}>
             &times;
           </button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            <div className="form-group">
-              <label className="form-label">Product Family</label>
-              <div className="form-static">{productFamily.name}</div>
-            </div>
+            {familyName && (
+              <div className="form-group">
+                <label className="form-label">Product Family</label>
+                <div className="form-static">{familyName}</div>
+              </div>
+            )}
 
             <div className="form-group">
               <label className="form-label">Name *</label>
@@ -151,8 +171,6 @@ export function CreateProductDialog({ connectionId, productFamily, onClose, onSu
                 rows={3}
               />
             </div>
-
-            {error && <div className="form-error">{error}</div>}
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -161,9 +179,9 @@ export function CreateProductDialog({ connectionId, productFamily, onClose, onSu
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={createMutation.isPending}
+              disabled={mutation.isPending}
             >
-              {createMutation.isPending ? 'Creating...' : 'Create Product'}
+              {mutation.isPending ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Create Product')}
             </button>
           </div>
         </form>

@@ -169,6 +169,30 @@ func (c *Client) CreateCustomer(input CustomerInput) (*Customer, error) {
 	return &wrapper.Customer, nil
 }
 
+// UpdateCustomer updates an existing customer
+func (c *Client) UpdateCustomer(id int64, input CustomerInput) (*Customer, error) {
+	req := CreateCustomerRequest{Customer: input}
+
+	path := fmt.Sprintf("/customers/%d.json", id)
+	resp, err := c.doRequest("PUT", path, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
+	}
+
+	var wrapper CustomerWrapper
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &wrapper.Customer, nil
+}
+
 // ListSubscriptions returns a list of subscriptions
 func (c *Client) ListSubscriptions(page, perPage int) ([]Subscription, error) {
 	if perPage <= 0 {
@@ -382,6 +406,56 @@ func (c *Client) CreateProduct(familyID int64, input ProductInput) (*Product, er
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
+	}
+
+	var wrapper ProductWrapper
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &wrapper.Product, nil
+}
+
+// UpdateProduct updates an existing product
+func (c *Client) UpdateProduct(productID int64, input ProductInput) (*Product, error) {
+	req := CreateProductRequest{Product: input}
+
+	path := fmt.Sprintf("/products/%d.json", productID)
+	resp, err := c.doRequest("PUT", path, req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
+	}
+
+	var wrapper ProductWrapper
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &wrapper.Product, nil
+}
+
+// GetProduct returns a single product by ID
+func (c *Client) GetProduct(id string) (*Product, error) {
+	path := fmt.Sprintf("/products/%s.json", id)
+	resp, err := c.doRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, NewAPIError(404, "product not found")
+	}
+
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
 	}

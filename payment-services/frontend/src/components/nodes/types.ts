@@ -1,7 +1,7 @@
 // Types for tree node handlers - payment billing hub version
 
 import type { ReactNode } from 'react'
-import type { ProductFamily } from '../../api'
+import type { ProductFamily, Customer, Product } from '../../api'
 
 export interface TreeNodeData {
   id: string
@@ -30,11 +30,15 @@ export interface NodeContext {
   // Tree operations
   toggleNode: (id: string) => void
   refreshQuery: (queryKey: string[]) => void
-  // Dialog/action operations
+  // Dialog/action operations - Create
   createCustomer: (connectionId: number) => void
   createSubscription: (connectionId: number, customerId?: number) => void
   createProductFamily: (connectionId: number) => void
   createProduct: (connectionId: number, productFamily: ProductFamily) => void
+  // Dialog/action operations - Edit
+  editCustomer: (connectionId: number, customer: Customer) => void
+  editProduct: (connectionId: number, product: Product) => void
+  // Connection operations
   testConnection: (connectionId: number) => void
   deleteConnection: (connectionId: number) => void
 }

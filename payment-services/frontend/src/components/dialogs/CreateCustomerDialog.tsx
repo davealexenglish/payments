@@ -1,20 +1,23 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api from '../../api'
+import api, { type Customer } from '../../api'
+import { useToast } from '../Toast'
 
 interface CreateCustomerDialogProps {
   connectionId: number
+  customer?: Customer // If provided, edit mode
   onClose: () => void
   onSuccess: () => void
 }
 
-export function CreateCustomerDialog({ connectionId, onClose, onSuccess }: CreateCustomerDialogProps) {
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [email, setEmail] = useState('')
-  const [organization, setOrganization] = useState('')
-  const [reference, setReference] = useState('')
-  const [error, setError] = useState<string | null>(null)
+export function CreateCustomerDialog({ connectionId, customer, onClose, onSuccess }: CreateCustomerDialogProps) {
+  const isEditMode = !!customer
+  const [firstName, setFirstName] = useState(customer?.first_name || '')
+  const [lastName, setLastName] = useState(customer?.last_name || '')
+  const [email, setEmail] = useState(customer?.email || '')
+  const [organization, setOrganization] = useState(customer?.organization || '')
+  const [reference, setReference] = useState(customer?.reference || '')
+  const { showToast } = useToast()
 
   const createMutation = useMutation({
     mutationFn: (data: { first_name: string; last_name: string; email: string; organization?: string; reference?: string }) =>
@@ -23,36 +26,48 @@ export function CreateCustomerDialog({ connectionId, onClose, onSuccess }: Creat
       onSuccess()
     },
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Failed to create customer')
+      showToast(err, 'error')
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: (data: { first_name: string; last_name: string; email: string; organization?: string; reference?: string }) =>
+      api.updateMaxioCustomer(connectionId, customer!.id, data),
+    onSuccess: () => {
+      onSuccess()
+    },
+    onError: (err) => {
+      showToast(err, 'error')
+    },
+  })
+
+  const mutation = isEditMode ? updateMutation : createMutation
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
 
     if (!firstName.trim()) {
-      setError('First name is required')
+      showToast('First name is required', 'error')
       return
     }
 
     if (!lastName.trim()) {
-      setError('Last name is required')
+      showToast('Last name is required', 'error')
       return
     }
 
     if (!email.trim()) {
-      setError('Email is required')
+      showToast('Email is required', 'error')
       return
     }
 
     // Basic email validation
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Please enter a valid email address')
+      showToast('Please enter a valid email address', 'error')
       return
     }
 
-    createMutation.mutate({
+    mutation.mutate({
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       email: email.trim(),
@@ -65,7 +80,7 @@ export function CreateCustomerDialog({ connectionId, onClose, onSuccess }: Creat
     <div className="modal-overlay">
       <div className="modal-dialog">
         <div className="modal-header">
-          Create Customer
+          {isEditMode ? 'Edit Customer' : 'Create Customer'}
           <button className="modal-close" onClick={onClose}>
             &times;
           </button>
@@ -129,8 +144,6 @@ export function CreateCustomerDialog({ connectionId, onClose, onSuccess }: Creat
                 Optional unique identifier from your system
               </div>
             </div>
-
-            {error && <div className="form-error">{error}</div>}
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -139,9 +152,9 @@ export function CreateCustomerDialog({ connectionId, onClose, onSuccess }: Creat
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={createMutation.isPending}
+              disabled={mutation.isPending}
             >
-              {createMutation.isPending ? 'Creating...' : 'Create Customer'}
+              {mutation.isPending ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Create Customer')}
             </button>
           </div>
         </form>

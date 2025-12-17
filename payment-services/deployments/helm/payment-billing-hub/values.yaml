@@ -8,7 +8,7 @@ backend:
   name: backend
   image:
     repository: payment-billing-hub-backend
-    tag: "0.1.5"
+    tag: "0.1.6"
     pullPolicy: IfNotPresent
   replicas: 1
   port: 8080
@@ -25,7 +25,7 @@ frontend:
   name: frontend
   image:
     repository: payment-billing-hub-frontend
-    tag: "0.1.9"
+    tag: "0.1.12"
     pullPolicy: IfNotPresent
   replicas: 1
   port: 80

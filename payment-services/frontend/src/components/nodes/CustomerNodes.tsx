@@ -1,4 +1,4 @@
-import { Users, User, Plus, RefreshCw } from 'lucide-react'
+import { Users, User, Plus, RefreshCw, Pencil } from 'lucide-react'
 import { createContainerNodeHandler, createLeafNodeHandler } from './BaseNode'
 import type { MenuItem, NodeContext, TreeNodeData } from './types'
 import type { Customer } from '../../api'
@@ -34,10 +34,15 @@ export const CustomerNode = createLeafNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { node, connectionId, createSubscription } = context
+    const { node, connectionId, createSubscription, editCustomer } = context
 
     if (connectionId && node.data) {
       const customer = node.data as Customer
+      items.push({
+        label: 'Edit Customer',
+        icon: <Pencil size={14} />,
+        action: () => editCustomer(connectionId, customer),
+      })
       items.push({
         label: 'Create Subscription',
         icon: <Plus size={14} />,

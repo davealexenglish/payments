@@ -25,12 +25,9 @@ function parseApiError(err: unknown): string {
   // Handle axios errors - get the response data
   let message = ''
 
-  console.log('parseApiError input:', err)
-
   // Check if it's an axios error with response data
   if (err && typeof err === 'object' && 'response' in err) {
     const axiosErr = err as { response?: { data?: { error?: string }, status?: number } }
-    console.log('axios response data:', axiosErr.response?.data)
     if (axiosErr.response?.data?.error) {
       message = axiosErr.response.data.error
     } else if (axiosErr.response?.status) {
@@ -47,24 +44,18 @@ function parseApiError(err: unknown): string {
     return 'An error occurred'
   }
 
-  console.log('message before parsing:', message)
-
   // Parse the message: "API error (status 422): {\"errors\":[\"...\"]}"
   const jsonMatch = message.match(/^(.*?):\s*(\{.*\})$/)
-  console.log('jsonMatch:', jsonMatch)
   if (jsonMatch) {
     const prefix = jsonMatch[1] // e.g., "API error (status 422)"
     try {
       const parsed = JSON.parse(jsonMatch[2])
-      console.log('parsed JSON:', parsed)
       if (parsed.errors && Array.isArray(parsed.errors)) {
         // Format: first line is the status, then each error on its own line
-        const result = `${prefix}\n${parsed.errors.join('\n')}`
-        console.log('final result:', result)
-        return result
+        return `${prefix}\n${parsed.errors.join('\n')}`
       }
-    } catch (e) {
-      console.log('JSON parse error:', e)
+    } catch {
+      // Fall through
     }
   }
   return message

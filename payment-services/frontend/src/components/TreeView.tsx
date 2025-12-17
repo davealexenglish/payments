@@ -11,6 +11,8 @@ interface TreeViewProps {
   onCreateSubscription: (connectionId: number, customerId?: number) => void
   onCreateProductFamily: (connectionId: number) => void
   onCreateProduct: (connectionId: number, productFamily: ProductFamily) => void
+  onEditCustomer: (connectionId: number, customer: Customer) => void
+  onEditProduct: (connectionId: number, product: Product) => void
 }
 
 interface ContextMenuState {
@@ -21,7 +23,7 @@ interface ContextMenuState {
 
 const ICON_SIZE = 14
 
-export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct }: TreeViewProps) {
+export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct }: TreeViewProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -70,6 +72,17 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
   const handleContextMenu = useCallback((e: React.MouseEvent, node: TreeNodeData) => {
     e.preventDefault()
 
+    // Select the node on right-click
+    setSelectedNodeId(node.id)
+    onSelectNode({
+      id: node.id,
+      type: node.type,
+      name: node.name,
+      data: node.data,
+      connectionId: node.connection_id,
+      platformType: node.platform_type,
+    })
+
     const handler = getNodeHandler(node.type)
     const context: NodeContext = {
       node,
@@ -81,6 +94,8 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
       createSubscription: onCreateSubscription,
       createProductFamily: onCreateProductFamily,
       createProduct: onCreateProduct,
+      editCustomer: onEditCustomer,
+      editProduct: onEditProduct,
       testConnection: handleTestConnection,
       deleteConnection: handleDeleteConnection,
     }
@@ -89,7 +104,7 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
     if (items.length > 0) {
       setContextMenu({ x: e.clientX, y: e.clientY, items })
     }
-  }, [queryClient, toggleNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct])
+  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct])
 
   const handleTestConnection = useCallback(
     async (connectionId: number) => {
@@ -165,13 +180,18 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
         <div
           className={`tree-node ${isSelected ? 'selected' : ''}`}
           style={{ paddingLeft: depth * 16 + 8 }}
-          onClick={() => {
-            handleNodeClick(treeNodeData)
-            if (hasChildren) toggleNode(node.id)
-          }}
+          onClick={() => handleNodeClick(treeNodeData)}
           onContextMenu={(e) => handleContextMenu(e, treeNodeData)}
         >
-          <span className="tree-node-toggle">
+          <span
+            className="tree-node-toggle"
+            onClick={(e) => {
+              if (hasChildren) {
+                e.stopPropagation()
+                toggleNode(node.id)
+              }
+            }}
+          >
             {hasChildren ? (
               isExpanded ? (
                 <ChevronDown size={14} />
