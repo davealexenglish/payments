@@ -62,8 +62,8 @@ export function CreateCustomerDialog({ connectionId, onClose, onSuccess }: Creat
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal-dialog">
         <div className="modal-header">
           Create Customer
           <button className="modal-close" onClick={onClose}>

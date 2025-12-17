@@ -45,8 +45,13 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /api/maxio/{connectionId}/customers", s.handleMaxioCreateCustomer)
 	mux.HandleFunc("GET /api/maxio/{connectionId}/customers/{customerId}", s.handleMaxioGetCustomer)
 	mux.HandleFunc("GET /api/maxio/{connectionId}/subscriptions", s.handleMaxioListSubscriptions)
+	mux.HandleFunc("POST /api/maxio/{connectionId}/subscriptions", s.handleMaxioCreateSubscription)
 	mux.HandleFunc("GET /api/maxio/{connectionId}/subscriptions/{subscriptionId}", s.handleMaxioGetSubscription)
 	mux.HandleFunc("GET /api/maxio/{connectionId}/products", s.handleMaxioListProducts)
+	mux.HandleFunc("GET /api/maxio/{connectionId}/product-families", s.handleMaxioListProductFamilies)
+	mux.HandleFunc("POST /api/maxio/{connectionId}/product-families", s.handleMaxioCreateProductFamily)
+	mux.HandleFunc("GET /api/maxio/{connectionId}/product-families/{familyId}/products", s.handleMaxioListProductsByFamily)
+	mux.HandleFunc("POST /api/maxio/{connectionId}/product-families/{familyId}/products", s.handleMaxioCreateProduct)
 	mux.HandleFunc("GET /api/maxio/{connectionId}/invoices", s.handleMaxioListInvoices)
 	mux.HandleFunc("GET /api/maxio/{connectionId}/payments", s.handleMaxioListPayments)
 

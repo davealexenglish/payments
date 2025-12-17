@@ -282,9 +282,9 @@ func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 					IsExpandable: true,
 				},
 				{
-					ID:           "products-" + strconv.FormatInt(id, 10),
-					Type:         "products",
-					Name:         "Products",
+					ID:           "product-families-" + strconv.FormatInt(id, 10),
+					Type:         "product-families",
+					Name:         "Product Families",
 					ConnectionID: &id,
 					PlatformType: platformType,
 					IsExpandable: true,

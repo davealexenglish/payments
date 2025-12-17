@@ -145,6 +145,41 @@ type ProductWrapper struct {
 	Product Product `json:"product"`
 }
 
+// ProductFamilyWrapper is the wrapper for product family responses
+type ProductFamilyWrapper struct {
+	ProductFamily ProductFamily `json:"product_family"`
+}
+
+// CreateProductFamilyRequest is the request body for creating a product family
+type CreateProductFamilyRequest struct {
+	ProductFamily ProductFamilyInput `json:"product_family"`
+}
+
+// ProductFamilyInput is the input for creating a product family
+type ProductFamilyInput struct {
+	Name        string `json:"name"`
+	Handle      string `json:"handle,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// CreateProductRequest is the request body for creating a product
+type CreateProductRequest struct {
+	Product ProductInput `json:"product"`
+}
+
+// ProductInput is the input for creating a product
+type ProductInput struct {
+	Name             string `json:"name"`
+	Handle           string `json:"handle,omitempty"`
+	Description      string `json:"description,omitempty"`
+	PriceInCents     int64  `json:"price_in_cents"`
+	Interval         int    `json:"interval"`
+	IntervalUnit     string `json:"interval_unit"` // month, day, week
+	TrialPriceInCents *int64 `json:"trial_price_in_cents,omitempty"`
+	TrialInterval    *int   `json:"trial_interval,omitempty"`
+	TrialIntervalUnit string `json:"trial_interval_unit,omitempty"`
+}
+
 // InvoiceWrapper is the wrapper for invoice responses
 type InvoiceWrapper struct {
 	Invoice Invoice `json:"invoice"`
@@ -206,4 +241,47 @@ type Payment struct {
 	PaymentMethod  interface{} `json:"payment_method,omitempty"`
 	TransactionType string    `json:"transaction_type,omitempty"`
 	Prepayment     bool       `json:"prepayment"`
+}
+
+// CreateSubscriptionRequest is the request body for creating a subscription
+type CreateSubscriptionRequest struct {
+	Subscription SubscriptionInput `json:"subscription"`
+}
+
+// SubscriptionInput is the input for creating a subscription
+type SubscriptionInput struct {
+	CustomerID                int64                `json:"customer_id"`
+	ProductID                 int64                `json:"product_id,omitempty"`
+	ProductHandle             string               `json:"product_handle,omitempty"`
+	ProductPricePointHandle   string               `json:"product_price_point_handle,omitempty"`
+	CouponCode                string               `json:"coupon_code,omitempty"`
+	PaymentCollectionMethod   string               `json:"payment_collection_method,omitempty"`
+	Reference                 string               `json:"reference,omitempty"`
+	PaymentProfileAttributes  *PaymentProfileInput `json:"payment_profile_attributes,omitempty"`
+	PaymentProfileID          *int64               `json:"payment_profile_id,omitempty"`
+	CreditCardAttributes      *CreditCardInput     `json:"credit_card_attributes,omitempty"`
+}
+
+// PaymentProfileInput is the input for creating a payment profile inline with subscription
+type PaymentProfileInput struct {
+	FirstName       string `json:"first_name,omitempty"`
+	LastName        string `json:"last_name,omitempty"`
+	FullNumber      string `json:"full_number,omitempty"`
+	ExpirationMonth int    `json:"expiration_month,omitempty"`
+	ExpirationYear  int    `json:"expiration_year,omitempty"`
+	CVV             string `json:"cvv,omitempty"`
+	BillingAddress  string `json:"billing_address,omitempty"`
+	BillingCity     string `json:"billing_city,omitempty"`
+	BillingState    string `json:"billing_state,omitempty"`
+	BillingZip      string `json:"billing_zip,omitempty"`
+	BillingCountry  string `json:"billing_country,omitempty"`
+	PaymentType     string `json:"payment_type,omitempty"` // credit_card, bank_account, etc.
+}
+
+// CreditCardInput is an alternative input format for credit card info
+type CreditCardInput struct {
+	FullNumber      string `json:"full_number"`
+	ExpirationMonth int    `json:"expiration_month"`
+	ExpirationYear  int    `json:"expiration_year"`
+	CVV             string `json:"cvv,omitempty"`
 }

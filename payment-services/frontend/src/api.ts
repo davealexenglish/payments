@@ -60,6 +60,15 @@ export interface Product {
   price_in_cents: number
   interval: number
   interval_unit: string
+  product_family?: ProductFamily
+}
+
+export interface ProductFamily {
+  id: number
+  name: string
+  handle?: string
+  description?: string
+  created_at?: string
 }
 
 export interface Invoice {
@@ -86,6 +95,38 @@ export interface CreateCustomerRequest {
   email: string
   organization?: string
   reference?: string
+}
+
+export interface CreditCardInput {
+  full_number: string
+  expiration_month: number
+  expiration_year: number
+  cvv?: string
+}
+
+export interface CreateSubscriptionRequest {
+  customer_id: number
+  product_id?: number
+  product_handle?: string
+  coupon_code?: string
+  reference?: string
+  payment_collection_method?: 'automatic' | 'invoice'
+  credit_card_attributes?: CreditCardInput
+}
+
+export interface CreateProductFamilyRequest {
+  name: string
+  handle?: string
+  description?: string
+}
+
+export interface CreateProductRequest {
+  name: string
+  handle?: string
+  description?: string
+  price_in_cents: number
+  interval: number
+  interval_unit: string
 }
 
 // Connection APIs
@@ -135,9 +176,34 @@ export const listMaxioSubscriptions = async (connectionId: number): Promise<Subs
   return response.data || []
 }
 
+export const createMaxioSubscription = async (connectionId: number, req: CreateSubscriptionRequest): Promise<Subscription> => {
+  const response = await api.post(`/api/maxio/${connectionId}/subscriptions`, req)
+  return response.data
+}
+
 export const listMaxioProducts = async (connectionId: number): Promise<Product[]> => {
   const response = await api.get(`/api/maxio/${connectionId}/products`)
   return response.data || []
+}
+
+export const listMaxioProductFamilies = async (connectionId: number): Promise<ProductFamily[]> => {
+  const response = await api.get(`/api/maxio/${connectionId}/product-families`)
+  return response.data || []
+}
+
+export const createMaxioProductFamily = async (connectionId: number, req: CreateProductFamilyRequest): Promise<ProductFamily> => {
+  const response = await api.post(`/api/maxio/${connectionId}/product-families`, req)
+  return response.data
+}
+
+export const listMaxioProductsByFamily = async (connectionId: number, familyId: number): Promise<Product[]> => {
+  const response = await api.get(`/api/maxio/${connectionId}/product-families/${familyId}/products`)
+  return response.data || []
+}
+
+export const createMaxioProduct = async (connectionId: number, familyId: number, req: CreateProductRequest): Promise<Product> => {
+  const response = await api.post(`/api/maxio/${connectionId}/product-families/${familyId}/products`, req)
+  return response.data
 }
 
 export const listMaxioInvoices = async (connectionId: number): Promise<Invoice[]> => {
@@ -155,6 +221,11 @@ export default {
   createMaxioCustomer,
   getMaxioCustomer,
   listMaxioSubscriptions,
+  createMaxioSubscription,
   listMaxioProducts,
+  listMaxioProductFamilies,
+  createMaxioProductFamily,
+  listMaxioProductsByFamily,
+  createMaxioProduct,
   listMaxioInvoices,
 }

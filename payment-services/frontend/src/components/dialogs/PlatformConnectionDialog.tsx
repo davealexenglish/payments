@@ -60,8 +60,8 @@ export function PlatformConnectionDialog({ onClose, onSuccess }: PlatformConnect
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal-dialog">
         <div className="modal-header">
           Add Platform Connection
           <button className="modal-close" onClick={onClose}>
