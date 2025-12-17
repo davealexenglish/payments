@@ -1,35 +1,27 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  ChevronRight,
-  ChevronDown,
-  Database,
-  Users,
-  CreditCard,
-  FileText,
-  Package,
-  DollarSign,
-  User,
-  RefreshCw,
-  Plus,
-  Trash2,
-  TestTube,
-} from 'lucide-react'
-import api, { type TreeNode, type Customer, type Subscription, type Product, type Invoice } from '../api'
+import { ChevronRight, ChevronDown } from 'lucide-react'
+import api, { type TreeNode, type Customer, type Subscription, type Product, type Invoice, type ProductFamily } from '../api'
 import type { SelectedNode } from '../App'
+import { getNodeHandler, type TreeNodeData, type NodeContext, type MenuItem } from './nodes'
 
 interface TreeViewProps {
   onSelectNode: (node: SelectedNode) => void
   onCreateCustomer: (connectionId: number) => void
+  onCreateSubscription: (connectionId: number, customerId?: number) => void
+  onCreateProductFamily: (connectionId: number) => void
+  onCreateProduct: (connectionId: number, productFamily: ProductFamily) => void
 }
 
 interface ContextMenuState {
   x: number
   y: number
-  node: TreeNode
+  items: MenuItem[]
 }
 
-export function TreeView({ onSelectNode, onCreateCustomer }: TreeViewProps) {
+const ICON_SIZE = 14
+
+export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct }: TreeViewProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -61,7 +53,7 @@ export function TreeView({ onSelectNode, onCreateCustomer }: TreeViewProps) {
   }, [])
 
   const handleNodeClick = useCallback(
-    (node: TreeNode) => {
+    (node: TreeNodeData) => {
       setSelectedNodeId(node.id)
       onSelectNode({
         id: node.id,
@@ -75,17 +67,29 @@ export function TreeView({ onSelectNode, onCreateCustomer }: TreeViewProps) {
     [onSelectNode]
   )
 
-  const handleContextMenu = useCallback((e: React.MouseEvent, node: TreeNode) => {
+  const handleContextMenu = useCallback((e: React.MouseEvent, node: TreeNodeData) => {
     e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY, node })
-  }, [])
 
-  const handleRefresh = useCallback(
-    (connectionId: number, type: string) => {
-      queryClient.invalidateQueries({ queryKey: ['maxio', type, connectionId] })
-    },
-    [queryClient]
-  )
+    const handler = getNodeHandler(node.type)
+    const context: NodeContext = {
+      node,
+      connectionId: node.connection_id,
+      platformType: node.platform_type,
+      toggleNode,
+      refreshQuery: (key: string[]) => queryClient.invalidateQueries({ queryKey: key }),
+      createCustomer: onCreateCustomer,
+      createSubscription: onCreateSubscription,
+      createProductFamily: onCreateProductFamily,
+      createProduct: onCreateProduct,
+      testConnection: handleTestConnection,
+      deleteConnection: handleDeleteConnection,
+    }
+
+    const items = handler.getContextMenuItems(context)
+    if (items.length > 0) {
+      setContextMenu({ x: e.clientX, y: e.clientY, items })
+    }
+  }, [queryClient, toggleNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct])
 
   const handleTestConnection = useCallback(
     async (connectionId: number) => {
@@ -112,79 +116,8 @@ export function TreeView({ onSelectNode, onCreateCustomer }: TreeViewProps) {
     [queryClient]
   )
 
-  const getIcon = (type: string) => {
-    const iconProps = { size: 14 }
-    switch (type) {
-      case 'platform-maxio':
-      case 'platform-zuora':
-      case 'platform-stripe':
-        return <Database {...iconProps} />
-      case 'customers':
-        return <Users {...iconProps} />
-      case 'customer':
-        return <User {...iconProps} />
-      case 'subscriptions':
-        return <CreditCard {...iconProps} />
-      case 'subscription':
-        return <CreditCard {...iconProps} />
-      case 'products':
-        return <Package {...iconProps} />
-      case 'product':
-        return <Package {...iconProps} />
-      case 'invoices':
-        return <FileText {...iconProps} />
-      case 'invoice':
-        return <FileText {...iconProps} />
-      case 'payments':
-        return <DollarSign {...iconProps} />
-      default:
-        return <Database {...iconProps} />
-    }
-  }
-
   const renderContextMenu = () => {
     if (!contextMenu) return null
-
-    const { node } = contextMenu
-    const items: { label: string; icon: React.ReactNode; action: () => void; danger?: boolean }[] =
-      []
-
-    if (node.type.startsWith('platform-') && node.connection_id) {
-      items.push({
-        label: 'Test Connection',
-        icon: <TestTube size={14} />,
-        action: () => handleTestConnection(node.connection_id!),
-      })
-      items.push({
-        label: 'Delete Connection',
-        icon: <Trash2 size={14} />,
-        action: () => handleDeleteConnection(node.connection_id!),
-        danger: true,
-      })
-    }
-
-    if (node.type === 'customers' && node.connection_id) {
-      items.push({
-        label: 'Create Customer',
-        icon: <Plus size={14} />,
-        action: () => onCreateCustomer(node.connection_id!),
-      })
-      items.push({
-        label: 'Refresh',
-        icon: <RefreshCw size={14} />,
-        action: () => handleRefresh(node.connection_id!, 'customers'),
-      })
-    }
-
-    if (['subscriptions', 'products', 'invoices', 'payments'].includes(node.type) && node.connection_id) {
-      items.push({
-        label: 'Refresh',
-        icon: <RefreshCw size={14} />,
-        action: () => handleRefresh(node.connection_id!, node.type),
-      })
-    }
-
-    if (items.length === 0) return null
 
     return (
       <div
@@ -192,7 +125,7 @@ export function TreeView({ onSelectNode, onCreateCustomer }: TreeViewProps) {
         style={{ left: contextMenu.x, top: contextMenu.y }}
         onClick={(e) => e.stopPropagation()}
       >
-        {items.map((item, index) => (
+        {contextMenu.items.map((item, index) => (
           <div
             key={index}
             className={`context-menu-item ${item.danger ? 'danger' : ''}`}
@@ -210,9 +143,22 @@ export function TreeView({ onSelectNode, onCreateCustomer }: TreeViewProps) {
   }
 
   const renderNode = (node: TreeNode, depth = 0) => {
+    const handler = getNodeHandler(node.type)
+    const treeNodeData: TreeNodeData = {
+      id: node.id,
+      type: node.type,
+      name: node.name,
+      connection_id: node.connection_id,
+      platform_type: node.platform_type,
+      children: node.children as TreeNodeData[] | undefined,
+      data: node.data,
+      is_expandable: node.is_expandable,
+    }
+
     const isExpanded = expandedNodes.has(node.id)
     const isSelected = selectedNodeId === node.id
-    const hasChildren = node.is_expandable || (node.children && node.children.length > 0)
+    const hasChildren = handler.hasChildren(treeNodeData)
+    const isLazyLoaded = handler.isLazyLoaded(treeNodeData)
 
     return (
       <div key={node.id}>
@@ -220,10 +166,10 @@ export function TreeView({ onSelectNode, onCreateCustomer }: TreeViewProps) {
           className={`tree-node ${isSelected ? 'selected' : ''}`}
           style={{ paddingLeft: depth * 16 + 8 }}
           onClick={() => {
-            handleNodeClick(node)
+            handleNodeClick(treeNodeData)
             if (hasChildren) toggleNode(node.id)
           }}
-          onContextMenu={(e) => handleContextMenu(e, node)}
+          onContextMenu={(e) => handleContextMenu(e, treeNodeData)}
         >
           <span className="tree-node-toggle">
             {hasChildren ? (
@@ -234,23 +180,24 @@ export function TreeView({ onSelectNode, onCreateCustomer }: TreeViewProps) {
               )
             ) : null}
           </span>
-          <span className="tree-node-icon">{getIcon(node.type)}</span>
-          <span className="tree-node-name">{node.name}</span>
+          <span className="tree-node-icon">{handler.getIcon(treeNodeData, ICON_SIZE)}</span>
+          <span className="tree-node-name">{handler.getDisplayName(treeNodeData)}</span>
         </div>
         {isExpanded && hasChildren && (
           <div className="tree-children">
             {node.children?.map((child) => renderNode(child, depth + 1))}
             {/* Lazy load children for entity containers */}
-            {!node.children && node.connection_id && (
+            {isLazyLoaded && !node.children && node.connection_id && (
               <LazyEntityList
                 type={node.type}
                 connectionId={node.connection_id}
                 platformType={node.platform_type}
                 depth={depth + 1}
                 selectedNodeId={selectedNodeId}
+                expandedNodes={expandedNodes}
                 onNodeClick={handleNodeClick}
                 onContextMenu={handleContextMenu}
-                getIcon={getIcon}
+                onToggleNode={toggleNode}
               />
             )}
           </div>
@@ -287,12 +234,13 @@ interface LazyEntityListProps {
   platformType?: string
   depth: number
   selectedNodeId: string | null
-  onNodeClick: (node: TreeNode) => void
-  onContextMenu: (e: React.MouseEvent, node: TreeNode) => void
-  getIcon: (type: string) => React.ReactNode
+  expandedNodes: Set<string>
+  onNodeClick: (node: TreeNodeData) => void
+  onContextMenu: (e: React.MouseEvent, node: TreeNodeData) => void
+  onToggleNode: (nodeId: string) => void
 }
 
-type EntityItem = Customer | Subscription | Product | Invoice
+type EntityItem = Customer | Subscription | Product | Invoice | ProductFamily
 
 function LazyEntityList({
   type,
@@ -300,9 +248,10 @@ function LazyEntityList({
   platformType,
   depth,
   selectedNodeId,
+  expandedNodes,
   onNodeClick,
   onContextMenu,
-  getIcon,
+  onToggleNode,
 }: LazyEntityListProps) {
   const fetchFn = useCallback(async (): Promise<EntityItem[]> => {
     if (platformType !== 'maxio') return []
@@ -312,8 +261,8 @@ function LazyEntityList({
         return api.listMaxioCustomers(connectionId)
       case 'subscriptions':
         return api.listMaxioSubscriptions(connectionId)
-      case 'products':
-        return api.listMaxioProducts(connectionId)
+      case 'product-families':
+        return api.listMaxioProductFamilies(connectionId)
       case 'invoices':
         return api.listMaxioInvoices(connectionId)
       default:
@@ -352,86 +301,164 @@ function LazyEntityList({
     )
   }
 
-  const getNodeName = (item: EntityItem): string => {
-    if ('email' in item && 'first_name' in item) {
-      const customer = item as Customer
-      return customer.email || `${customer.first_name} ${customer.last_name}`
-    }
-    if ('state' in item && 'id' in item && !('number' in item)) {
-      const subscription = item as Subscription
-      return `#${subscription.id} (${subscription.state})`
-    }
-    if ('name' in item) {
-      const product = item as Product
-      return product.name
-    }
-    if ('number' in item && 'status' in item) {
-      const invoice = item as Invoice
-      return `#${invoice.number} (${invoice.status})`
-    }
-    return 'Unknown'
-  }
-
-  const getItemId = (item: EntityItem): string => {
-    if ('uid' in item) return item.uid
-    if ('id' in item) return String(item.id)
-    return 'unknown'
-  }
-
-  const getItemType = () => {
+  // Determine the entity type from the container type
+  const getEntityType = (): string => {
     switch (type) {
-      case 'customers':
-        return 'customer'
-      case 'subscriptions':
-        return 'subscription'
-      case 'products':
-        return 'product'
-      case 'invoices':
-        return 'invoice'
-      default:
-        return type.slice(0, -1)
+      case 'customers': return 'customer'
+      case 'subscriptions': return 'subscription'
+      case 'product-families': return 'product-family'
+      case 'invoices': return 'invoice'
+      default: return type.slice(0, -1)
     }
   }
+
+  const entityType = getEntityType()
 
   return (
     <>
       {data.map((item: EntityItem) => {
-        const itemId = getItemId(item)
-        const nodeId = `${type.slice(0, -1)}-${connectionId}-${itemId}`
+        const itemId = 'uid' in item ? item.uid : String(item.id)
+        const nodeId = `${entityType}-${connectionId}-${itemId}`
+        const handler = getNodeHandler(entityType)
+        const isExpandable = handler.hasChildren({ id: nodeId, type: entityType, name: '', is_expandable: true, data: item })
+
+        const treeNodeData: TreeNodeData = {
+          id: nodeId,
+          type: entityType,
+          name: '', // Will be derived by handler
+          data: item,
+          connection_id: connectionId,
+          platform_type: platformType,
+          is_expandable: isExpandable,
+        }
+
         const isSelected = selectedNodeId === nodeId
-        const itemType = getItemType()
+        const isExpanded = expandedNodes.has(nodeId)
+
+        return (
+          <div key={nodeId}>
+            <div
+              className={`tree-node ${isSelected ? 'selected' : ''}`}
+              style={{ paddingLeft: depth * 16 + 8 }}
+              onClick={() => {
+                onNodeClick(treeNodeData)
+                if (isExpandable) {
+                  onToggleNode(nodeId)
+                }
+              }}
+              onContextMenu={(e) => onContextMenu(e, treeNodeData)}
+            >
+              <span className="tree-node-toggle">
+                {isExpandable ? (
+                  isExpanded ? (
+                    <ChevronDown size={14} />
+                  ) : (
+                    <ChevronRight size={14} />
+                  )
+                ) : null}
+              </span>
+              <span className="tree-node-icon">{handler.getIcon(treeNodeData, ICON_SIZE)}</span>
+              <span className="tree-node-name">{handler.getDisplayName(treeNodeData)}</span>
+            </div>
+            {/* Show products inside expanded product family */}
+            {isExpandable && isExpanded && entityType === 'product-family' && (
+              <ProductsList
+                connectionId={connectionId}
+                familyId={Number(itemId)}
+                platformType={platformType}
+                depth={depth + 1}
+                selectedNodeId={selectedNodeId}
+                onNodeClick={onNodeClick}
+                onContextMenu={onContextMenu}
+              />
+            )}
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+// Separate component for loading products within a product family
+interface ProductsListProps {
+  connectionId: number
+  familyId: number
+  platformType?: string
+  depth: number
+  selectedNodeId: string | null
+  onNodeClick: (node: TreeNodeData) => void
+  onContextMenu: (e: React.MouseEvent, node: TreeNodeData) => void
+}
+
+function ProductsList({
+  connectionId,
+  familyId,
+  platformType,
+  depth,
+  selectedNodeId,
+  onNodeClick,
+  onContextMenu,
+}: ProductsListProps) {
+  const handler = getNodeHandler('product')
+
+  const { data, isLoading, error } = useQuery<Product[]>({
+    queryKey: ['maxio', `products-${familyId}`, connectionId],
+    queryFn: () => api.listMaxioProductsByFamily(connectionId, familyId),
+    enabled: platformType === 'maxio',
+  })
+
+  if (isLoading) {
+    return (
+      <div className="tree-loading" style={{ paddingLeft: depth * 16 + 8 }}>
+        <div className="spinner" />
+        Loading...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="tree-empty" style={{ paddingLeft: depth * 16 + 8, color: 'var(--error-color)' }}>
+        Error loading products
+      </div>
+    )
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="tree-empty" style={{ paddingLeft: depth * 16 + 8 }}>
+        No products
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {data.map((product: Product) => {
+        const nodeId = `product-${connectionId}-${product.id}`
+        const isSelected = selectedNodeId === nodeId
+
+        const treeNodeData: TreeNodeData = {
+          id: nodeId,
+          type: 'product',
+          name: product.name,
+          data: product,
+          connection_id: connectionId,
+          platform_type: platformType,
+          is_expandable: false,
+        }
 
         return (
           <div
             key={nodeId}
             className={`tree-node ${isSelected ? 'selected' : ''}`}
             style={{ paddingLeft: depth * 16 + 8 }}
-            onClick={() =>
-              onNodeClick({
-                id: nodeId,
-                type: itemType,
-                name: getNodeName(item),
-                data: item,
-                connection_id: connectionId,
-                platform_type: platformType,
-                is_expandable: false,
-              })
-            }
-            onContextMenu={(e) =>
-              onContextMenu(e, {
-                id: nodeId,
-                type: itemType,
-                name: getNodeName(item),
-                data: item,
-                connection_id: connectionId,
-                platform_type: platformType,
-                is_expandable: false,
-              })
-            }
+            onClick={() => onNodeClick(treeNodeData)}
+            onContextMenu={(e) => onContextMenu(e, treeNodeData)}
           >
             <span className="tree-node-toggle" />
-            <span className="tree-node-icon">{getIcon(itemType)}</span>
-            <span className="tree-node-name">{getNodeName(item)}</span>
+            <span className="tree-node-icon">{handler.getIcon(treeNodeData, ICON_SIZE)}</span>
+            <span className="tree-node-name">{handler.getDisplayName(treeNodeData)}</span>
           </div>
         )
       })}

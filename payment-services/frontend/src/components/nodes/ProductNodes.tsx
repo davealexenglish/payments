@@ -1,0 +1,76 @@
+import { FolderTree, Folder, Package, Plus, RefreshCw } from 'lucide-react'
+import { createContainerNodeHandler, createExpandableEntityHandler, createLeafNodeHandler } from './BaseNode'
+import type { MenuItem, NodeContext, TreeNodeData } from './types'
+import type { ProductFamily, Product } from '../../api'
+
+// Product Families container node
+export const ProductFamiliesNode = createContainerNodeHandler({
+  icon: (size) => <FolderTree size={size} />,
+
+  getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
+    const items: MenuItem[] = []
+    const { connectionId, createProductFamily, refreshQuery } = context
+
+    if (connectionId) {
+      items.push({
+        label: 'Create Product Family',
+        icon: <Plus size={14} />,
+        action: () => createProductFamily(connectionId),
+      })
+      items.push({
+        label: 'Refresh',
+        icon: <RefreshCw size={14} />,
+        action: () => refreshQuery(['maxio', 'product-families', String(connectionId)]),
+      })
+    }
+
+    return items
+  },
+})
+
+// Individual product family node (expandable - contains products)
+export const ProductFamilyNode = createExpandableEntityHandler({
+  icon: (size) => <Folder size={size} />,
+
+  getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
+    const items: MenuItem[] = []
+    const { node, connectionId, createProduct, refreshQuery } = context
+
+    if (connectionId && node.data) {
+      const family = node.data as ProductFamily
+      items.push({
+        label: 'Create Product',
+        icon: <Plus size={14} />,
+        action: () => createProduct(connectionId, family),
+      })
+      items.push({
+        label: 'Refresh',
+        icon: <RefreshCw size={14} />,
+        action: () => refreshQuery(['maxio', `products-${family.id}`, String(connectionId)]),
+      })
+    }
+
+    return items
+  },
+
+  getDisplayName: (node: TreeNodeData): string => {
+    if (node.data) {
+      const family = node.data as ProductFamily
+      return family.name
+    }
+    return node.name
+  },
+})
+
+// Individual product node (leaf)
+export const ProductNode = createLeafNodeHandler({
+  icon: (size) => <Package size={size} />,
+
+  getDisplayName: (node: TreeNodeData): string => {
+    if (node.data) {
+      const product = node.data as Product
+      return product.name
+    }
+    return node.name
+  },
+})

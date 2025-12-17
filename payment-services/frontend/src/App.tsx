@@ -5,6 +5,11 @@ import { PropertiesPanel } from './components/PropertiesPanel'
 import { Toolbar } from './components/Toolbar'
 import { PlatformConnectionDialog } from './components/dialogs/PlatformConnectionDialog'
 import { CreateCustomerDialog } from './components/dialogs/CreateCustomerDialog'
+import { CreateSubscriptionDialog } from './components/dialogs/CreateSubscriptionDialog'
+import { CreateProductFamilyDialog } from './components/dialogs/CreateProductFamilyDialog'
+import { CreateProductDialog } from './components/dialogs/CreateProductDialog'
+import { ToastProvider } from './components/Toast'
+import type { ProductFamily } from './api'
 import './App.css'
 
 const queryClient = new QueryClient()
@@ -24,6 +29,14 @@ function App() {
   const [showConnectionDialog, setShowConnectionDialog] = useState(false)
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false)
   const [createCustomerConnectionId, setCreateCustomerConnectionId] = useState<number | null>(null)
+  const [showCreateSubscriptionDialog, setShowCreateSubscriptionDialog] = useState(false)
+  const [createSubscriptionConnectionId, setCreateSubscriptionConnectionId] = useState<number | null>(null)
+  const [createSubscriptionCustomerId, setCreateSubscriptionCustomerId] = useState<number | undefined>(undefined)
+  const [showCreateProductFamilyDialog, setShowCreateProductFamilyDialog] = useState(false)
+  const [createProductFamilyConnectionId, setCreateProductFamilyConnectionId] = useState<number | null>(null)
+  const [showCreateProductDialog, setShowCreateProductDialog] = useState(false)
+  const [createProductConnectionId, setCreateProductConnectionId] = useState<number | null>(null)
+  const [createProductFamily, setCreateProductFamily] = useState<ProductFamily | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef<string | null>(null)
@@ -55,6 +68,23 @@ function App() {
     setShowCreateCustomerDialog(true)
   }, [])
 
+  const handleCreateSubscription = useCallback((connectionId: number, customerId?: number) => {
+    setCreateSubscriptionConnectionId(connectionId)
+    setCreateSubscriptionCustomerId(customerId)
+    setShowCreateSubscriptionDialog(true)
+  }, [])
+
+  const handleCreateProductFamily = useCallback((connectionId: number) => {
+    setCreateProductFamilyConnectionId(connectionId)
+    setShowCreateProductFamilyDialog(true)
+  }, [])
+
+  const handleCreateProduct = useCallback((connectionId: number, productFamily: ProductFamily) => {
+    setCreateProductConnectionId(connectionId)
+    setCreateProductFamily(productFamily)
+    setShowCreateProductDialog(true)
+  }, [])
+
   const handleRefreshTree = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['tree'] })
     queryClient.invalidateQueries({ queryKey: ['connections'] })
@@ -62,6 +92,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ToastProvider>
       <div
         className="app"
         ref={containerRef}
@@ -82,6 +113,9 @@ function App() {
               <TreeView
                 onSelectNode={setSelectedNode}
                 onCreateCustomer={handleCreateCustomer}
+                onCreateSubscription={handleCreateSubscription}
+                onCreateProductFamily={handleCreateProductFamily}
+                onCreateProduct={handleCreateProduct}
               />
             </div>
           </div>
@@ -129,7 +163,65 @@ function App() {
             }}
           />
         )}
+
+        {/* Create Subscription Dialog */}
+        {showCreateSubscriptionDialog && createSubscriptionConnectionId && (
+          <CreateSubscriptionDialog
+            connectionId={createSubscriptionConnectionId}
+            customerId={createSubscriptionCustomerId}
+            onClose={() => {
+              setShowCreateSubscriptionDialog(false)
+              setCreateSubscriptionConnectionId(null)
+              setCreateSubscriptionCustomerId(undefined)
+            }}
+            onSuccess={() => {
+              setShowCreateSubscriptionDialog(false)
+              setCreateSubscriptionConnectionId(null)
+              setCreateSubscriptionCustomerId(undefined)
+              queryClient.invalidateQueries({ queryKey: ['maxio', 'subscriptions'] })
+            }}
+          />
+        )}
+
+        {/* Create Product Family Dialog */}
+        {showCreateProductFamilyDialog && createProductFamilyConnectionId && (
+          <CreateProductFamilyDialog
+            connectionId={createProductFamilyConnectionId}
+            onClose={() => {
+              setShowCreateProductFamilyDialog(false)
+              setCreateProductFamilyConnectionId(null)
+            }}
+            onSuccess={() => {
+              setShowCreateProductFamilyDialog(false)
+              setCreateProductFamilyConnectionId(null)
+              queryClient.invalidateQueries({ queryKey: ['maxio', 'product-families'] })
+            }}
+          />
+        )}
+
+        {/* Create Product Dialog */}
+        {showCreateProductDialog && createProductConnectionId && createProductFamily && (
+          <CreateProductDialog
+            connectionId={createProductConnectionId}
+            productFamily={createProductFamily}
+            onClose={() => {
+              setShowCreateProductDialog(false)
+              setCreateProductConnectionId(null)
+              setCreateProductFamily(null)
+            }}
+            onSuccess={() => {
+              setShowCreateProductDialog(false)
+              setCreateProductConnectionId(null)
+              const familyId = createProductFamily?.id
+              setCreateProductFamily(null)
+              if (familyId) {
+                queryClient.invalidateQueries({ queryKey: ['maxio', `products-${familyId}`] })
+              }
+            }}
+          />
+        )}
       </div>
+      </ToastProvider>
     </QueryClientProvider>
   )
 }
