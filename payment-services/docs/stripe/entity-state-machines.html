@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Entity State Machines</title>
+    <style>
+        :root {
+            --stripe-purple: #635bff;
+            --bg-light: #f8f9fa;
+            --border-color: #dee2e6;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--stripe-purple);
+            border-bottom: 3px solid var(--stripe-purple);
+            padding-bottom: 20px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        nav.toc {
+            background: var(--bg-light);
+            padding: 20px 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+            color: var(--stripe-purple);
+        }
+
+        .toc ul {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 30px;
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .toc a {
+            color: var(--stripe-purple);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        .diagram-section {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+
+        .diagram-section h2 {
+            color: var(--stripe-purple);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .diagram-section .description {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .diagram-container {
+            text-align: center;
+            background: var(--bg-light);
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .diagram-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .states-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .state-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .state-initial { background: #fff2cc; color: #9a6700; border: 1px solid #d6b656; }
+        .state-pending { background: #e1d5e7; color: #5c4a6e; border: 1px solid #9673a6; }
+        .state-active { background: #d5e8d4; color: #2d6a2d; border: 1px solid #82b366; }
+        .state-suspended { background: #ffe6cc; color: #8a5a00; border: 1px solid #d79b00; }
+        .state-processing { background: #dae8fc; color: #3a5a8a; border: 1px solid #6c8ebf; }
+        .state-terminal { background: #f8cecc; color: #8b2c2c; border: 1px solid #b85450; }
+
+        .complexity-indicator {
+            float: right;
+            font-size: 12px;
+            color: #666;
+            background: var(--bg-light);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        @media print {
+            .diagram-section {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* Navigation Bar */
+        .nav-bar {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 12px 20px;
+            background: #2c3e50;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .nav-bar a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .nav-bar a:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .nav-bar a.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .nav-home {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding-right: 20px;
+            border-right: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .nav-home svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .nav-dropdown {
+            position: relative;
+            padding: 6px 12px;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-dropdown:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .nav-dropdown.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .nav-dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .nav-dropdown-toggle::after {
+            content: "";
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid currentColor;
+            margin-left: 2px;
+        }
+
+        .nav-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: #2c3e50;
+            border-radius: 6px;
+            padding: 8px 0;
+            min-width: 160px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            display: block;
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 8px 16px;
+            border-radius: 0;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .nav-dropdown-menu a.active {
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-bar">
+        <a href="../index.html" class="nav-home">
+            <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            Home
+        </a>
+        <a href="../api-comparisons.html">API Comparisons</a>
+        <div class="nav-dropdown">
+            <span class="nav-dropdown-toggle">Zuora</span>
+            <div class="nav-dropdown-menu">
+                <a href="../zuora/order-to-cash-flow.html">OTC Flow</a>
+                <a href="../zuora/entity-state-machines.html">State Machines</a>
+            </div>
+        </div>
+        <div class="nav-dropdown active">
+            <span class="nav-dropdown-toggle">Stripe</span>
+            <div class="nav-dropdown-menu">
+                <a href="entity-state-machines.html" class="active">State Machines</a>
+            </div>
+        </div>
+        <div class="nav-dropdown">
+            <span class="nav-dropdown-toggle">Maxio</span>
+            <div class="nav-dropdown-menu">
+                <a href="../maxio/entity-state-machines.html">State Machines</a>
+            </div>
+        </div>
+    </nav>
+
+    <h1>Stripe Entity State Machines</h1>
+    <p class="subtitle">Lifecycle diagrams for core Stripe billing entities</p>
+
+    <nav class="toc">
+        <h3>Quick Navigation</h3>
+        <ul>
+            <li><a href="#subscription">Subscription</a></li>
+            <li><a href="#payment-intent">PaymentIntent</a></li>
+            <li><a href="#invoice">Invoice</a></li>
+        </ul>
+    </nav>
+
+    <!-- Subscription -->
+    <section class="diagram-section" id="subscription">
+        <h2>Subscription Lifecycle <span class="complexity-indicator">8 states</span></h2>
+        <p class="description">
+            Stripe Subscriptions manage recurring billing for customers. They support trial periods, pause/resume,
+            and various cancellation behaviors. The <code>incomplete</code> states handle payment setup failures,
+            while <code>past_due</code> and <code>unpaid</code> manage collection retry logic.
+        </p>
+        <div class="diagram-container">
+            <img src="subscription-lifecycle.png" alt="Stripe Subscription Lifecycle State Machine">
+        </div>
+        <div class="states-summary">
+            <span class="state-badge state-initial">incomplete</span>
+            <span class="state-badge state-terminal">incomplete_expired</span>
+            <span class="state-badge state-pending">trialing</span>
+            <span class="state-badge state-active">active</span>
+            <span class="state-badge state-suspended">past_due</span>
+            <span class="state-badge state-terminal">unpaid</span>
+            <span class="state-badge state-suspended">paused</span>
+            <span class="state-badge state-terminal">canceled</span>
+        </div>
+    </section>
+
+    <!-- PaymentIntent -->
+    <section class="diagram-section" id="payment-intent">
+        <h2>PaymentIntent Lifecycle <span class="complexity-indicator">7 states</span></h2>
+        <p class="description">
+            PaymentIntents track the lifecycle of a payment from creation to completion. They handle
+            various authentication flows (3D Secure, bank redirects), capture modes (automatic vs manual),
+            and provide clear states for client-side integration.
+        </p>
+        <div class="diagram-container">
+            <img src="payment-intent-lifecycle.png" alt="Stripe PaymentIntent Lifecycle State Machine">
+        </div>
+        <div class="states-summary">
+            <span class="state-badge state-initial">requires_payment_method</span>
+            <span class="state-badge state-pending">requires_confirmation</span>
+            <span class="state-badge state-pending">requires_action</span>
+            <span class="state-badge state-processing">processing</span>
+            <span class="state-badge state-pending">requires_capture</span>
+            <span class="state-badge state-active">succeeded</span>
+            <span class="state-badge state-terminal">canceled</span>
+        </div>
+    </section>
+
+    <!-- Invoice -->
+    <section class="diagram-section" id="invoice">
+        <h2>Invoice Lifecycle <span class="complexity-indicator">5 states</span></h2>
+        <p class="description">
+            Stripe Invoices are billing documents that can be sent to customers for payment.
+            They start as drafts, are finalized to <code>open</code>, and transition to terminal
+            states based on payment success, failure, or manual action.
+        </p>
+        <div class="diagram-container">
+            <img src="invoice-lifecycle.png" alt="Stripe Invoice Lifecycle State Machine">
+        </div>
+        <div class="states-summary">
+            <span class="state-badge state-initial">draft</span>
+            <span class="state-badge state-processing">open</span>
+            <span class="state-badge state-active">paid</span>
+            <span class="state-badge state-terminal">uncollectible</span>
+            <span class="state-badge state-terminal">void</span>
+        </div>
+    </section>
+
+    <footer>
+        <p>Stripe Entity State Machines - Sinch Payment Services</p>
+        <p>Source: <a href="https://stripe.com/docs/api">Stripe API Documentation</a></p>
+        <p>Last updated: December 2024</p>
+    </footer>
+</body>
+</html>

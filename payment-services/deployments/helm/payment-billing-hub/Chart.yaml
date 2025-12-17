@@ -1,0 +1,6 @@
+apiVersion: v2
+name: payment-billing-hub
+description: A tree-based application for interacting with payment platform APIs
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,2 +1,40 @@
 # DrawIO backup files
 .$*.bkp
+
+# Dependencies
+node_modules/
+
+# Build output
+**/dist/
+**/server
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# External spec repos (cloned separately)
+stripe/openapi/
