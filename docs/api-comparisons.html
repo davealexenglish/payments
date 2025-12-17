@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment API Comparison: Zuora vs Stripe vs Maxio</title>
+    <style>
+        :root {
+            --zuora-color: #0033a0;
+            --stripe-color: #635bff;
+            --maxio-color: #00a67e;
+            --bg-light: #f8f9fa;
+            --border-color: #dee2e6;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+        }
+
+        h1 {
+            text-align: center;
+            color: #1a1a1a;
+            border-bottom: 3px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            border-left: 4px solid var(--stripe-color);
+            padding-left: 15px;
+            margin-top: 40px;
+        }
+
+        h3 {
+            color: #34495e;
+            margin-top: 25px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        th {
+            background: #2c3e50;
+            color: white;
+            font-weight: 600;
+        }
+
+        th:nth-child(2) { background: var(--zuora-color); }
+        th:nth-child(3) { background: var(--stripe-color); }
+        th:nth-child(4) { background: var(--maxio-color); }
+
+        tr:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        tr:hover {
+            background: #e8f4f8;
+        }
+
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            color: #c7254e;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .diagram {
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        .callout {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .callout.info {
+            background: #cce5ff;
+            border-left-color: #004085;
+        }
+
+        .provider-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            margin-right: 8px;
+        }
+
+        .badge-zuora { background: var(--zuora-color); }
+        .badge-stripe { background: var(--stripe-color); }
+        .badge-maxio { background: var(--maxio-color); }
+
+        .section {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+
+        .toc {
+            background: var(--bg-light);
+            padding: 20px 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+        }
+
+        .toc ul {
+            columns: 2;
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .toc li {
+            margin: 8px 0;
+        }
+
+        .toc a {
+            color: var(--stripe-color);
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        .check { color: #28a745; }
+        .cross { color: #dc3545; }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            color: #6c757d;
+            font-size: 14px;
+        }
+        /* Navigation Bar */
+        .nav-bar {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 12px 20px;
+            background: #2c3e50;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .nav-bar a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .nav-bar a:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .nav-bar a.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .nav-home {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding-right: 20px;
+            border-right: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .nav-home svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .nav-dropdown {
+            position: relative;
+            padding: 6px 12px;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-dropdown:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .nav-dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .nav-dropdown-toggle::after {
+            content: "";
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid currentColor;
+            margin-left: 2px;
+        }
+
+        .nav-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: #2c3e50;
+            border-radius: 6px;
+            padding: 8px 0;
+            min-width: 160px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            display: block;
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 8px 16px;
+            border-radius: 0;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: rgba(255,255,255,0.15);
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-bar">
+        <a href="index.html" class="nav-home">
+            <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            Home
+        </a>
+        <a href="api-comparisons.html" class="active">API Comparisons</a>
+        <div class="nav-dropdown">
+            <span class="nav-dropdown-toggle">Zuora</span>
+            <div class="nav-dropdown-menu">
+                <a href="zuora/order-to-cash-flow.html">OTC Flow</a>
+                <a href="zuora/entity-state-machines.html">State Machines</a>
+            </div>
+        </div>
+        <div class="nav-dropdown">
+            <span class="nav-dropdown-toggle">Stripe</span>
+            <div class="nav-dropdown-menu">
+                <a href="stripe/entity-state-machines.html">State Machines</a>
+            </div>
+        </div>
+        <div class="nav-dropdown">
+            <span class="nav-dropdown-toggle">Maxio</span>
+            <div class="nav-dropdown-menu">
+                <a href="maxio/entity-state-machines.html">State Machines</a>
+            </div>
+        </div>
+    </nav>
+
+    <h1>Payment API Comparison<br><small style="font-size: 0.5em; color: #666;">Zuora vs Stripe vs Maxio (Chargify)</small></h1>
+
+    <nav class="toc">
+        <h3>Table of Contents</h3>
+        <ul>
+            <li><a href="#account">1. Account / Customer</a></li>
+            <li><a href="#subscription">2. Subscription</a></li>
+            <li><a href="#payment">3. Payment</a></li>
+            <li><a href="#amendment">4. Amendment / Modifications</a></li>
+            <li><a href="#relationships">5. Object Relationships</a></li>
+            <li><a href="#takeaways">6. Key Takeaways</a></li>
+        </ul>
+    </nav>
+
+    <!-- SECTION 1: ACCOUNT / CUSTOMER -->
+    <section class="section" id="account">
+        <h2>1. Account / Customer</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio (Chargify)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Term Used</strong></td>
+                    <td>Account</td>
+                    <td>Customer</td>
+                    <td>Customer</td>
+                </tr>
+                <tr>
+                    <td><strong>Create</strong></td>
+                    <td><code>POST /v1/accounts</code></td>
+                    <td><code>POST /v1/customers</code></td>
+                    <td><code>POST /customers.json</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Retrieve</strong></td>
+                    <td><code>GET /v1/accounts/{key}</code></td>
+                    <td><code>GET /v1/customers/{id}</code></td>
+                    <td><code>GET /customers/{id}.json</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Key ID Field</strong></td>
+                    <td><code>accountNumber</code> or <code>id</code></td>
+                    <td><code>id</code> (cus_xxx)</td>
+                    <td><code>id</code> or <code>reference</code></td>
+                </tr>
+                <tr>
+                    <td><strong>External ID</strong></td>
+                    <td><code>crmId</code></td>
+                    <td><code>metadata</code></td>
+                    <td><code>reference</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Balance Tracking</strong></td>
+                    <td><span class="check">✅</span> <code>balance</code>, <code>creditBalance</code></td>
+                    <td><span class="check">✅</span> <code>balance</code></td>
+                    <td><span class="check">✅</span> Via subscription</td>
+                </tr>
+                <tr>
+                    <td><strong>Hierarchy</strong></td>
+                    <td><span class="check">✅</span> <code>parentId</code></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span> <code>parent_id</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Tax Handling</strong></td>
+                    <td><code>VATId</code>, <code>exemptStatus</code></td>
+                    <td><code>tax_ids</code>, <code>tax_exempt</code></td>
+                    <td><code>vat_number</code>, <code>tax_exempt</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Key Differences</h3>
+        <ul>
+            <li><span class="provider-badge badge-zuora">Zuora</span> Most enterprise-focused with billing contacts (billTo, soldTo, shipTo), payment terms (Net 30/60/90), and invoice templates</li>
+            <li><span class="provider-badge badge-stripe">Stripe</span> Developer-friendly with simple <code>metadata</code> for custom fields</li>
+            <li><span class="provider-badge badge-maxio">Maxio</span> Includes portal access management and Salesforce integration built-in</li>
+        </ul>
+    </section>
+
+    <!-- SECTION 2: SUBSCRIPTION -->
+    <section class="section" id="subscription">
+        <h2>2. Subscription</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio (Chargify)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Create</strong></td>
+                    <td><code>POST /v1/subscriptions</code></td>
+                    <td><code>POST /v1/subscriptions</code></td>
+                    <td><code>POST /subscriptions.json</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Retrieve</strong></td>
+                    <td><code>GET /v1/subscriptions/{key}</code></td>
+                    <td><code>GET /v1/subscriptions/{id}</code></td>
+                    <td><code>GET /subscriptions/{id}.json</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Cancel</strong></td>
+                    <td><code>PUT .../cancel</code></td>
+                    <td><code>DELETE /v1/subscriptions/{id}</code></td>
+                    <td><code>DELETE /subscriptions/{id}.json</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Pause</strong></td>
+                    <td><code>PUT .../suspend</code></td>
+                    <td><code>POST ...</code> with <code>pause_collection</code></td>
+                    <td><code>POST .../hold.json</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Resume</strong></td>
+                    <td><code>PUT .../resume</code></td>
+                    <td><code>POST .../resume</code></td>
+                    <td><code>POST .../resume.json</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Term Types</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>TERMED / EVERGREEN</td>
+                    <td>Implicit (<code>cancel_at_period_end</code>)</td>
+                    <td>Implicit (<code>cancel_at_end_of_period</code>)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Statuses</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Draft, Pending Activation, Active, Suspended, Cancelled</td>
+                    <td>incomplete, active, past_due, canceled, paused</td>
+                    <td>active, past_due, expired, canceled, paused, on_hold</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Line Items Structure</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Rate Plans → Rate Plan Charges</td>
+                    <td>Subscription Items → Prices</td>
+                    <td>Product + Components</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- SECTION 3: PAYMENT -->
+    <section class="section" id="payment">
+        <h2>3. Payment</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio (Chargify)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Payment Object</strong></td>
+                    <td>Payment</td>
+                    <td>PaymentIntent + Charge</td>
+                    <td>Payment (on Invoice)</td>
+                </tr>
+                <tr>
+                    <td><strong>Create</strong></td>
+                    <td><code>POST /v1/payments</code></td>
+                    <td><code>POST /v1/payment_intents</code></td>
+                    <td><code>POST /subscriptions/{id}/payments.json</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Refund</strong></td>
+                    <td><code>POST /v1/payments/{id}/refunds</code></td>
+                    <td><code>POST /v1/refunds</code></td>
+                    <td><code>POST /invoices/{uid}/refunds.json</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Apply to Invoice</strong></td>
+                    <td><code>PUT .../apply</code></td>
+                    <td>Automatic</td>
+                    <td>Automatic</td>
+                </tr>
+                <tr>
+                    <td><strong>Unapply</strong></td>
+                    <td><code>PUT .../unapply</code></td>
+                    <td>N/A</td>
+                    <td>N/A</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Payment Flow</h3>
+        <div class="diagram">
+<strong>ZUORA:</strong>
+  Payment → Apply to → Invoice/Debit Memo
+  (Payments can exist unapplied, then be applied later)
+
+<strong>STRIPE:</strong>
+  PaymentIntent → Charge → Applied to Invoice
+  (More atomic - payment tied to specific intent)
+
+<strong>MAXIO:</strong>
+  Payment → Recorded against → Subscription → Invoice
+  (Tightly coupled to subscription billing)</div>
+
+        <h3>Payment Methods</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Stored on Account</td>
+                    <td>Stored on Customer</td>
+                    <td>Stored on Subscription</td>
+                </tr>
+                <tr>
+                    <td><code>defaultPaymentMethodId</code></td>
+                    <td><code>default_payment_method</code></td>
+                    <td><code>credit_card_attributes</code></td>
+                </tr>
+                <tr>
+                    <td>Cascading fallback <span class="check">✅</span></td>
+                    <td>Fallback to customer default</td>
+                    <td>Single per subscription</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- SECTION 4: AMENDMENT -->
+    <section class="section" id="amendment">
+        <h2>4. Amendment / Modifications</h2>
+
+        <div class="callout info">
+            This is where the platforms differ most significantly. Each has a fundamentally different approach to modifying subscriptions.
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio (Chargify)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Concept</strong></td>
+                    <td>Formal "Amendment" object</td>
+                    <td>Inline subscription updates</td>
+                    <td>"Allocations" + subscription updates</td>
+                </tr>
+                <tr>
+                    <td><strong>Add Product</strong></td>
+                    <td>Order Action / Amendment</td>
+                    <td>Add SubscriptionItem</td>
+                    <td>Add Component Allocation</td>
+                </tr>
+                <tr>
+                    <td><strong>Remove Product</strong></td>
+                    <td>Order Action / Amendment</td>
+                    <td>Delete SubscriptionItem</td>
+                    <td>Allocate to 0</td>
+                </tr>
+                <tr>
+                    <td><strong>Change Quantity</strong></td>
+                    <td>Order Action</td>
+                    <td>Update SubscriptionItem</td>
+                    <td>Create Allocation</td>
+                </tr>
+                <tr>
+                    <td><strong>Upgrade/Downgrade</strong></td>
+                    <td>Amendment with proration</td>
+                    <td>Update price, set proration_behavior</td>
+                    <td>Product migration endpoint</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Proration Handling</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Zuora</th>
+                    <th>Stripe</th>
+                    <th>Maxio</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Complex: Invoice on demand, Credit memo generation</td>
+                    <td>Simple: <code>proration_behavior</code> param (create_prorations, none, always_invoice)</td>
+                    <td>Per-allocation: <code>upgrade_charge</code>, <code>downgrade_credit</code> (full, prorated, none)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Zuora's Amendment Types</h3>
+        <ul>
+            <li>Terms & Conditions change</li>
+            <li>Add Product</li>
+            <li>Remove Product</li>
+            <li>Renewal</li>
+            <li>Cancellation</li>
+            <li>Owner Transfer</li>
+        </ul>
+
+        <h3>Code Examples</h3>
+
+        <h4><span class="provider-badge badge-stripe">Stripe</span> Modification Approach</h4>
+        <pre>POST /v1/subscriptions/{id}
+{
+  "items": [
+    {
+      "id": "si_xxx",
+      "price": "price_new"
+    }
+  ],
+  "proration_behavior": "create_prorations"
+}</pre>
+
+        <h4><span class="provider-badge badge-maxio">Maxio</span> Component Allocation</h4>
+        <pre>POST /subscriptions/{id}/components/{component_id}/allocations.json
+{
+  "allocation": {
+    "quantity": 5,
+    "memo": "Upgrading to 5 seats",
+    "upgrade_charge": "prorated"
+  }
+}</pre>
+    </section>
+
+    <!-- SECTION 5: OBJECT RELATIONSHIPS -->
+    <section class="section" id="relationships">
+        <h2>5. Object Relationships</h2>
+
+        <h3><span class="provider-badge badge-zuora">Zuora</span></h3>
+        <div class="diagram">Account ─┬─→ Subscription ─→ Rate Plan ─→ Rate Plan Charge
+        │
+        ├─→ Payment Method
+        │
+        ├─→ Payment ─→ Applied to Invoice
+        │
+        └─→ Invoice ←── generated from ─── Subscription
+                 ↑
+           Amendment (creates new version/segment)</div>
+
+        <h3><span class="provider-badge badge-stripe">Stripe</span></h3>
+        <div class="diagram">Customer ─┬─→ Subscription ─→ SubscriptionItem ─→ Price
+          │
+          ├─→ PaymentMethod
+          │
+          └─→ PaymentIntent ─→ Charge
+                    ↓
+                 Invoice (auto-generated per billing cycle)
+
+(Modifications = update SubscriptionItem in place, proration auto-calc)</div>
+
+        <h3><span class="provider-badge badge-maxio">Maxio</span></h3>
+        <div class="diagram">Customer ─→ Subscription ─┬─→ Product
+                          │
+                          ├─→ Component ─→ Allocation (qty change)
+                          │
+                          ├─→ Coupon
+                          │
+                          └─→ Invoice ─→ Payment
+
+(Modifications = Allocations on Components, or Product migrations)</div>
+    </section>
+
+    <!-- SECTION 6: KEY TAKEAWAYS -->
+    <section class="section" id="takeaways">
+        <h2>6. Key Takeaways</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>If you need...</th>
+                    <th>Best fit</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Enterprise billing with complex contracts</td>
+                    <td><span class="provider-badge badge-zuora">Zuora</span></td>
+                </tr>
+                <tr>
+                    <td>Developer-friendly payment processing</td>
+                    <td><span class="provider-badge badge-stripe">Stripe</span></td>
+                </tr>
+                <tr>
+                    <td>SaaS-focused with usage-based billing</td>
+                    <td><span class="provider-badge badge-maxio">Maxio</span></td>
+                </tr>
+                <tr>
+                    <td>Formal amendment audit trail</td>
+                    <td><span class="provider-badge badge-zuora">Zuora</span></td>
+                </tr>
+                <tr>
+                    <td>Simple subscription modifications</td>
+                    <td><span class="provider-badge badge-stripe">Stripe</span></td>
+                </tr>
+                <tr>
+                    <td>Component-based add-ons</td>
+                    <td><span class="provider-badge badge-maxio">Maxio</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout">
+            <strong>Note:</strong> Many organizations use multiple platforms together. For example, Zuora or Maxio for subscription management with Stripe as the payment gateway.
+        </div>
+    </section>
+
+    <footer>
+        <p>Generated for Sinch Payment Services Team</p>
+        <p>Last updated: December 2024</p>
+    </footer>
+</body>
+</html>
