@@ -1,4 +1,4 @@
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, HelpCircle } from 'lucide-react'
 import type { SelectedNode } from '../App'
 
 interface ToolbarProps {
@@ -8,6 +8,10 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ onAddConnection, onRefresh }: ToolbarProps) {
+  const handleHelp = () => {
+    window.open('/docs/index.html', '_blank')
+  }
+
   return (
     <div className="toolbar">
       <span className="toolbar-title">Payment Billing Hub</span>
@@ -18,6 +22,10 @@ export function Toolbar({ onAddConnection, onRefresh }: ToolbarProps) {
       <button className="btn btn-secondary btn-sm" onClick={onRefresh}>
         <RefreshCw size={14} />
         Refresh
+      </button>
+      <button className="btn btn-secondary btn-sm" onClick={handleHelp}>
+        <HelpCircle size={14} />
+        Help
       </button>
     </div>
   )

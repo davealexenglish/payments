@@ -113,6 +113,45 @@ func (s *Server) handleMaxioGetCustomer(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, http.StatusOK, customer)
 }
 
+func (s *Server) handleMaxioUpdateCustomer(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	customerID, err := strconv.ParseInt(r.PathValue("customerId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid customer ID")
+		return
+	}
+
+	client, err := s.getMaxioClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var input maxio.CustomerInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if input.FirstName == "" || input.LastName == "" || input.Email == "" {
+		respondError(w, http.StatusBadRequest, "first_name, last_name, and email are required")
+		return
+	}
+
+	customer, err := client.UpdateCustomer(customerID, input)
+	if err != nil {
+		respondAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, customer)
+}
+
 func (s *Server) handleMaxioListSubscriptions(w http.ResponseWriter, r *http.Request) {
 	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
 	if err != nil {
@@ -365,6 +404,86 @@ func (s *Server) handleMaxioCreateProduct(w http.ResponseWriter, r *http.Request
 	}
 
 	respondJSON(w, http.StatusCreated, product)
+}
+
+func (s *Server) handleMaxioGetProduct(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	productID := r.PathValue("productId")
+	if productID == "" {
+		respondError(w, http.StatusBadRequest, "Product ID is required")
+		return
+	}
+
+	client, err := s.getMaxioClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	product, err := client.GetProduct(productID)
+	if err != nil {
+		respondAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, product)
+}
+
+func (s *Server) handleMaxioUpdateProduct(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	productID, err := strconv.ParseInt(r.PathValue("productId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid product ID")
+		return
+	}
+
+	client, err := s.getMaxioClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var input maxio.ProductInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if input.Name == "" {
+		respondError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+
+	if input.PriceInCents <= 0 {
+		respondError(w, http.StatusBadRequest, "price_in_cents must be positive")
+		return
+	}
+
+	if input.IntervalUnit == "" {
+		input.IntervalUnit = "month"
+	}
+
+	if input.Interval <= 0 {
+		input.Interval = 1
+	}
+
+	product, err := client.UpdateProduct(productID, input)
+	if err != nil {
+		respondAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, product)
 }
 
 func (s *Server) handleMaxioListInvoices(w http.ResponseWriter, r *http.Request) {

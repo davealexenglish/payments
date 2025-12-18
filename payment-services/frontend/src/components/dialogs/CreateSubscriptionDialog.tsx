@@ -80,6 +80,17 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
         showToast('Expiration date is required', 'error')
         return
       }
+      // Check if card is expired
+      const now = new Date()
+      const currentYear = now.getFullYear()
+      const currentMonth = now.getMonth() + 1 // getMonth() is 0-indexed
+      const expYear = Number(expirationYear)
+      const expMonth = Number(expirationMonth)
+
+      if (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth)) {
+        showToast('Credit card has expired. Please use a valid card.', 'error')
+        return
+      }
     }
 
     const requestData: Parameters<typeof api.createMaxioSubscription>[1] = {

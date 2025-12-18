@@ -171,6 +171,11 @@ export const getMaxioCustomer = async (connectionId: number, customerId: string)
   return response.data
 }
 
+export const updateMaxioCustomer = async (connectionId: number, customerId: number, req: CreateCustomerRequest): Promise<Customer> => {
+  const response = await api.put(`/api/maxio/${connectionId}/customers/${customerId}`, req)
+  return response.data
+}
+
 export const listMaxioSubscriptions = async (connectionId: number): Promise<Subscription[]> => {
   const response = await api.get(`/api/maxio/${connectionId}/subscriptions`)
   return response.data || []
@@ -206,6 +211,16 @@ export const createMaxioProduct = async (connectionId: number, familyId: number,
   return response.data
 }
 
+export const getMaxioProduct = async (connectionId: number, productId: number): Promise<Product> => {
+  const response = await api.get(`/api/maxio/${connectionId}/products/${productId}`)
+  return response.data
+}
+
+export const updateMaxioProduct = async (connectionId: number, productId: number, req: CreateProductRequest): Promise<Product> => {
+  const response = await api.put(`/api/maxio/${connectionId}/products/${productId}`, req)
+  return response.data
+}
+
 export const listMaxioInvoices = async (connectionId: number): Promise<Invoice[]> => {
   const response = await api.get(`/api/maxio/${connectionId}/invoices`)
   return response.data || []
@@ -220,6 +235,7 @@ export default {
   listMaxioCustomers,
   createMaxioCustomer,
   getMaxioCustomer,
+  updateMaxioCustomer,
   listMaxioSubscriptions,
   createMaxioSubscription,
   listMaxioProducts,
@@ -227,5 +243,7 @@ export default {
   createMaxioProductFamily,
   listMaxioProductsByFamily,
   createMaxioProduct,
+  getMaxioProduct,
+  updateMaxioProduct,
   listMaxioInvoices,
 }
