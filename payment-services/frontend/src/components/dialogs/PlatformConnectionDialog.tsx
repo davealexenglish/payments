@@ -1,14 +1,23 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api from '../../api'
+import api, { type PlatformConnection } from '../../api'
 
 interface PlatformConnectionDialogProps {
+  platformType: PlatformConnection['platform_type']
   onClose: () => void
   onSuccess: () => void
 }
 
-export function PlatformConnectionDialog({ onClose, onSuccess }: PlatformConnectionDialogProps) {
-  const [platformType, setPlatformType] = useState<'maxio' | 'zuora' | 'stripe'>('maxio')
+// Helper to get display name for platform type
+function getPlatformDisplayName(platformType: PlatformConnection['platform_type']): string {
+  switch (platformType) {
+    case 'maxio': return 'Maxio (Chargify)'
+    case 'stripe': return 'Stripe'
+    case 'zuora': return 'Zuora'
+  }
+}
+
+export function PlatformConnectionDialog({ platformType, onClose, onSuccess }: PlatformConnectionDialogProps) {
   const [name, setName] = useState('')
   const [subdomain, setSubdomain] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -59,30 +68,19 @@ export function PlatformConnectionDialog({ onClose, onSuccess }: PlatformConnect
     })
   }
 
+  const platformDisplayName = getPlatformDisplayName(platformType)
+
   return (
     <div className="modal-overlay">
       <div className="modal-dialog">
         <div className="modal-header">
-          Add Platform Connection
+          Add {platformDisplayName} Connection
           <button className="modal-close" onClick={onClose}>
             &times;
           </button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            <div className="form-group">
-              <label className="form-label">Platform</label>
-              <select
-                className="form-select"
-                value={platformType}
-                onChange={(e) => setPlatformType(e.target.value as 'maxio' | 'zuora' | 'stripe')}
-              >
-                <option value="maxio">Maxio (Chargify)</option>
-                <option value="zuora">Zuora</option>
-                <option value="stripe">Stripe</option>
-              </select>
-            </div>
-
             <div className="form-group">
               <label className="form-label">Connection Name</label>
               <input

@@ -9,7 +9,7 @@ import { CreateSubscriptionDialog } from './components/dialogs/CreateSubscriptio
 import { CreateProductFamilyDialog } from './components/dialogs/CreateProductFamilyDialog'
 import { CreateProductDialog } from './components/dialogs/CreateProductDialog'
 import { ToastProvider } from './components/Toast'
-import type { ProductFamily, Customer, Product } from './api'
+import type { ProductFamily, Customer, Product, PlatformConnection } from './api'
 import './App.css'
 
 const queryClient = new QueryClient()
@@ -23,10 +23,19 @@ export interface SelectedNode {
   platformType?: string
 }
 
+// Helper to extract platform type from vendor node type
+function getPlatformTypeFromVendorNode(nodeType: string): PlatformConnection['platform_type'] | null {
+  if (nodeType === 'vendor-maxio') return 'maxio'
+  if (nodeType === 'vendor-stripe') return 'stripe'
+  if (nodeType === 'vendor-zuora') return 'zuora'
+  return null
+}
+
 function App() {
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
   const [treePanelWidth, setTreePanelWidth] = useState(300)
   const [showConnectionDialog, setShowConnectionDialog] = useState(false)
+  const [connectionDialogPlatformType, setConnectionDialogPlatformType] = useState<PlatformConnection['platform_type'] | null>(null)
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false)
   const [createCustomerConnectionId, setCreateCustomerConnectionId] = useState<number | null>(null)
   const [showCreateSubscriptionDialog, setShowCreateSubscriptionDialog] = useState(false)
@@ -119,7 +128,13 @@ function App() {
       >
         <Toolbar
           selectedNode={selectedNode}
-          onAddConnection={() => setShowConnectionDialog(true)}
+          onAddConnection={() => {
+            const platformType = selectedNode ? getPlatformTypeFromVendorNode(selectedNode.type) : null
+            if (platformType) {
+              setConnectionDialogPlatformType(platformType)
+              setShowConnectionDialog(true)
+            }
+          }}
           onRefresh={handleRefreshTree}
         />
         <div className="main-layout">
@@ -157,11 +172,16 @@ function App() {
         </div>
 
         {/* Connection Dialog */}
-        {showConnectionDialog && (
+        {showConnectionDialog && connectionDialogPlatformType && (
           <PlatformConnectionDialog
-            onClose={() => setShowConnectionDialog(false)}
+            platformType={connectionDialogPlatformType}
+            onClose={() => {
+              setShowConnectionDialog(false)
+              setConnectionDialogPlatformType(null)
+            }}
             onSuccess={() => {
               setShowConnectionDialog(false)
+              setConnectionDialogPlatformType(null)
               handleRefreshTree()
             }}
           />

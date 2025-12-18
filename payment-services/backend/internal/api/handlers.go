@@ -246,7 +246,33 @@ func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var tree []*models.TreeNode
+	// Create the three vendor root nodes
+	vendorNodes := map[string]*models.TreeNode{
+		"maxio": {
+			ID:           "vendor-maxio",
+			Type:         "vendor-maxio",
+			Name:         "Maxio (Chargify)",
+			PlatformType: "maxio",
+			IsExpandable: true,
+			Children:     []*models.TreeNode{},
+		},
+		"stripe": {
+			ID:           "vendor-stripe",
+			Type:         "vendor-stripe",
+			Name:         "Stripe",
+			PlatformType: "stripe",
+			IsExpandable: true,
+			Children:     []*models.TreeNode{},
+		},
+		"zuora": {
+			ID:           "vendor-zuora",
+			Type:         "vendor-zuora",
+			Name:         "Zuora",
+			PlatformType: "zuora",
+			IsExpandable: true,
+			Children:     []*models.TreeNode{},
+		},
+	}
 
 	for rows.Next() {
 		var id int64
@@ -256,10 +282,10 @@ func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Create platform node with entity containers
-		platformNode := &models.TreeNode{
-			ID:           "platform-" + strconv.FormatInt(id, 10),
-			Type:         "platform-" + platformType,
+		// Create connection node with entity containers
+		connectionNode := &models.TreeNode{
+			ID:           "connection-" + strconv.FormatInt(id, 10),
+			Type:         "connection",
 			Name:         name,
 			ConnectionID: &id,
 			PlatformType: platformType,
@@ -308,7 +334,17 @@ func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 
-		tree = append(tree, platformNode)
+		// Add connection to the appropriate vendor node
+		if vendorNode, ok := vendorNodes[platformType]; ok {
+			vendorNode.Children = append(vendorNode.Children, connectionNode)
+		}
+	}
+
+	// Return the three vendor root nodes in order
+	tree := []*models.TreeNode{
+		vendorNodes["maxio"],
+		vendorNodes["stripe"],
+		vendorNodes["zuora"],
 	}
 
 	respondJSON(w, http.StatusOK, tree)

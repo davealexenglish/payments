@@ -18,6 +18,33 @@ The Orders API integrates with these platforms using four core concepts:
 - **Payment** - Transaction processing
 - **Amendment** - Modifications to subscriptions (upgrades, downgrades, quantity changes)
 
+## Application Architecture
+
+### Tree Structure (Vendor Root Nodes)
+The tree view uses a three-tier hierarchy:
+1. **Vendor Nodes** (root level) - `vendor-maxio`, `vendor-stripe`, `vendor-zuora`
+2. **Connection Nodes** - Individual API connections under each vendor (type: `connection`)
+3. **Entity Containers** - Customers, Subscriptions, Products, Invoices under each connection
+
+The "Add Connection" button in the toolbar is only enabled when a vendor node is selected, and the connection dialog is pre-configured for that vendor's platform type.
+
+### Frontend Node Types
+- `vendor-*` nodes: Root level vendor groupings (VendorNodes.tsx)
+- `connection` nodes: Individual platform connections
+- `customers-container`, `products-container`, etc.: Entity groupings
+- `customer`, `product`, `subscription`, `invoice`: Individual entities
+
+### Edit vs Create Dialogs
+Customer and Product dialogs support both create and edit modes:
+- Create mode: Pass `connectionId` only
+- Edit mode: Pass `connectionId` + existing entity (`customer` or `product` prop)
+
+### API Endpoints (Maxio)
+- Customers: GET/POST list, GET/PUT individual (`/api/maxio/{connectionId}/customers/{customerId}`)
+- Products: GET/POST list, GET/PUT individual (`/api/maxio/{connectionId}/products/{productId}`)
+- Subscriptions: GET/POST list, GET individual
+- Product Families: GET/POST list, GET products by family
+
 ## Reference Materials
 
 ### OpenAPI Specifications (sibling directories)
