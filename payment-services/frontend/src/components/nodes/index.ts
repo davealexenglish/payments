@@ -16,7 +16,8 @@ export * from './types'
 export { DefaultNodeHandler, createContainerNodeHandler, createLeafNodeHandler, createExpandableEntityHandler } from './BaseNode'
 
 // Specific node handlers
-export { PlatformNode } from './PlatformNodes'
+export { PlatformNode, ConnectionNode } from './PlatformNodes'
+export { VendorMaxioNode, VendorStripeNode, VendorZuoraNode } from './VendorNodes'
 export { CustomersNode, CustomerNode } from './CustomerNodes'
 export { ProductFamiliesNode, ProductFamilyNode, ProductNode } from './ProductNodes'
 export { SubscriptionsNode, SubscriptionNode } from './SubscriptionNodes'
@@ -26,7 +27,8 @@ export { PaymentsNode, PaymentNode } from './PaymentNodes'
 // Import handlers for registry
 import type { NodeHandler } from './types'
 import { DefaultNodeHandler } from './BaseNode'
-import { PlatformNode } from './PlatformNodes'
+import { PlatformNode, ConnectionNode } from './PlatformNodes'
+import { VendorMaxioNode, VendorStripeNode, VendorZuoraNode } from './VendorNodes'
 import { CustomersNode, CustomerNode } from './CustomerNodes'
 import { ProductFamiliesNode, ProductFamilyNode, ProductNode } from './ProductNodes'
 import { SubscriptionsNode, SubscriptionNode } from './SubscriptionNodes'
@@ -35,7 +37,15 @@ import { PaymentsNode, PaymentNode } from './PaymentNodes'
 
 // Node type registry - maps node.type to handler
 export const nodeRegistry: Record<string, NodeHandler> = {
-  // Platform nodes
+  // Vendor root nodes (top-level)
+  'vendor-maxio': VendorMaxioNode,
+  'vendor-stripe': VendorStripeNode,
+  'vendor-zuora': VendorZuoraNode,
+
+  // Connection node (child of vendor)
+  'connection': ConnectionNode,
+
+  // Platform nodes (legacy, kept for compatibility)
   'platform-maxio': PlatformNode,
   'platform-zuora': PlatformNode,
   'platform-stripe': PlatformNode,
