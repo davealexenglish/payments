@@ -21,6 +21,8 @@ export function PlatformConnectionDialog({ platformType, onClose, onSuccess }: P
   const [name, setName] = useState('')
   const [subdomain, setSubdomain] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
   const [isSandbox, setIsSandbox] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,21 +51,30 @@ export function PlatformConnectionDialog({ platformType, onClose, onSuccess }: P
       return
     }
 
-    if (!apiKey.trim()) {
-      setError('API Key is required')
-      return
-    }
-
-    if (platformType === 'maxio' && !subdomain.trim()) {
-      setError('Subdomain is required for Maxio')
-      return
+    // Validate based on platform type
+    if (platformType === 'zuora') {
+      if (!clientId.trim() || !clientSecret.trim()) {
+        setError('Client ID and Client Secret are required for Zuora')
+        return
+      }
+    } else {
+      if (!apiKey.trim()) {
+        setError('API Key is required')
+        return
+      }
+      if (platformType === 'maxio' && !subdomain.trim()) {
+        setError('Subdomain is required for Maxio')
+        return
+      }
     }
 
     createMutation.mutate({
       platform_type: platformType,
       name: name.trim(),
-      subdomain: subdomain.trim(),
-      api_key: apiKey.trim(),
+      subdomain: platformType === 'maxio' ? subdomain.trim() : undefined,
+      api_key: platformType !== 'zuora' ? apiKey.trim() : undefined,
+      client_id: platformType === 'zuora' ? clientId.trim() : undefined,
+      client_secret: platformType === 'zuora' ? clientSecret.trim() : undefined,
       is_sandbox: isSandbox,
     })
   }
@@ -108,16 +119,41 @@ export function PlatformConnectionDialog({ platformType, onClose, onSuccess }: P
               </div>
             )}
 
-            <div className="form-group">
-              <label className="form-label">API Key</label>
-              <input
-                type="password"
-                className="form-input"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter your API key"
-              />
-            </div>
+            {platformType === 'zuora' ? (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Client ID</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    placeholder="Enter your OAuth Client ID"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Client Secret</label>
+                  <input
+                    type="password"
+                    className="form-input"
+                    value={clientSecret}
+                    onChange={(e) => setClientSecret(e.target.value)}
+                    placeholder="Enter your OAuth Client Secret"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="form-group">
+                <label className="form-label">API Key</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Enter your API key"
+                />
+              </div>
+            )}
 
             <div className="form-group">
               <label className="form-checkbox">

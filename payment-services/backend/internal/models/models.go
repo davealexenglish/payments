@@ -118,8 +118,10 @@ type TreeNode struct {
 type CreateConnectionRequest struct {
 	PlatformType PlatformType `json:"platform_type"`
 	Name         string       `json:"name"`
-	Subdomain    string       `json:"subdomain,omitempty"`
-	APIKey       string       `json:"api_key"`
+	Subdomain    string       `json:"subdomain,omitempty"`     // Used by Maxio
+	APIKey       string       `json:"api_key,omitempty"`       // Used by Maxio, Stripe
+	ClientID     string       `json:"client_id,omitempty"`     // Used by Zuora
+	ClientSecret string       `json:"client_secret,omitempty"` // Used by Zuora
 	IsSandbox    bool         `json:"is_sandbox"`
 }
 

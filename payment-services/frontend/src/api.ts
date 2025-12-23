@@ -85,7 +85,9 @@ export interface CreateConnectionRequest {
   platform_type: 'maxio' | 'zuora' | 'stripe'
   name: string
   subdomain?: string
-  api_key: string
+  api_key?: string       // Used by Maxio, Stripe
+  client_id?: string     // Used by Zuora
+  client_secret?: string // Used by Zuora
   is_sandbox: boolean
 }
 
@@ -226,12 +228,56 @@ export const listMaxioInvoices = async (connectionId: number): Promise<Invoice[]
   return response.data || []
 }
 
+// Zuora APIs
+// Note: Zuora uses "Account" instead of "Customer", but we map to the same frontend types
+export const listZuoraAccounts = async (connectionId: number): Promise<Customer[]> => {
+  const response = await api.get(`/api/zuora/${connectionId}/accounts`)
+  return response.data || []
+}
+
+export const createZuoraAccount = async (connectionId: number, req: CreateCustomerRequest): Promise<Customer> => {
+  const response = await api.post(`/api/zuora/${connectionId}/accounts`, req)
+  return response.data
+}
+
+export const getZuoraAccount = async (connectionId: number, accountId: string): Promise<Customer> => {
+  const response = await api.get(`/api/zuora/${connectionId}/accounts/${accountId}`)
+  return response.data
+}
+
+export const listZuoraSubscriptions = async (connectionId: number): Promise<Subscription[]> => {
+  const response = await api.get(`/api/zuora/${connectionId}/subscriptions`)
+  return response.data || []
+}
+
+export const createZuoraSubscription = async (connectionId: number, req: CreateSubscriptionRequest): Promise<Subscription> => {
+  const response = await api.post(`/api/zuora/${connectionId}/subscriptions`, req)
+  return response.data
+}
+
+// Zuora uses Product Catalog instead of Product Families
+export const listZuoraProductCatalogs = async (connectionId: number): Promise<ProductFamily[]> => {
+  const response = await api.get(`/api/zuora/${connectionId}/products`)
+  return response.data || []
+}
+
+export const listZuoraProductsByRatePlan = async (connectionId: number, productId: number): Promise<Product[]> => {
+  const response = await api.get(`/api/zuora/${connectionId}/products/${productId}/rate-plans`)
+  return response.data || []
+}
+
+export const listZuoraInvoices = async (connectionId: number): Promise<Invoice[]> => {
+  const response = await api.get(`/api/zuora/${connectionId}/invoices`)
+  return response.data || []
+}
+
 export default {
   listConnections,
   createConnection,
   testConnection,
   deleteConnection,
   getTree,
+  // Maxio
   listMaxioCustomers,
   createMaxioCustomer,
   getMaxioCustomer,
@@ -246,4 +292,13 @@ export default {
   getMaxioProduct,
   updateMaxioProduct,
   listMaxioInvoices,
+  // Zuora
+  listZuoraAccounts,
+  createZuoraAccount,
+  getZuoraAccount,
+  listZuoraSubscriptions,
+  createZuoraSubscription,
+  listZuoraProductCatalogs,
+  listZuoraProductsByRatePlan,
+  listZuoraInvoices,
 }

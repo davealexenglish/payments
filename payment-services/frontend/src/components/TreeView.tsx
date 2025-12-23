@@ -274,26 +274,40 @@ function LazyEntityList({
   onToggleNode,
 }: LazyEntityListProps) {
   const fetchFn = useCallback(async (): Promise<EntityItem[]> => {
-    if (platformType !== 'maxio') return []
-
-    switch (type) {
-      case 'customers':
-        return api.listMaxioCustomers(connectionId)
-      case 'subscriptions':
-        return api.listMaxioSubscriptions(connectionId)
-      case 'product-families':
-        return api.listMaxioProductFamilies(connectionId)
-      case 'invoices':
-        return api.listMaxioInvoices(connectionId)
-      default:
-        return []
+    if (platformType === 'maxio') {
+      switch (type) {
+        case 'customers':
+          return api.listMaxioCustomers(connectionId)
+        case 'subscriptions':
+          return api.listMaxioSubscriptions(connectionId)
+        case 'product-families':
+          return api.listMaxioProductFamilies(connectionId)
+        case 'invoices':
+          return api.listMaxioInvoices(connectionId)
+        default:
+          return []
+      }
+    } else if (platformType === 'zuora') {
+      switch (type) {
+        case 'customers':
+          return api.listZuoraAccounts(connectionId)
+        case 'subscriptions':
+          return api.listZuoraSubscriptions(connectionId)
+        case 'product-families':
+          return api.listZuoraProductCatalogs(connectionId)
+        case 'invoices':
+          return api.listZuoraInvoices(connectionId)
+        default:
+          return []
+      }
     }
+    return []
   }, [type, connectionId, platformType])
 
   const { data, isLoading, error } = useQuery<EntityItem[]>({
-    queryKey: ['maxio', type, connectionId],
+    queryKey: [platformType || 'unknown', type, connectionId],
     queryFn: fetchFn,
-    enabled: platformType === 'maxio',
+    enabled: platformType === 'maxio' || platformType === 'zuora',
   })
 
   if (isLoading) {
@@ -421,10 +435,19 @@ function ProductsList({
 }: ProductsListProps) {
   const handler = getNodeHandler('product')
 
+  const fetchProductsFn = useCallback(async (): Promise<Product[]> => {
+    if (platformType === 'maxio') {
+      return api.listMaxioProductsByFamily(connectionId, familyId)
+    } else if (platformType === 'zuora') {
+      return api.listZuoraProductsByRatePlan(connectionId, familyId)
+    }
+    return []
+  }, [connectionId, familyId, platformType])
+
   const { data, isLoading, error } = useQuery<Product[]>({
-    queryKey: ['maxio', `products-${familyId}`, connectionId],
-    queryFn: () => api.listMaxioProductsByFamily(connectionId, familyId),
-    enabled: platformType === 'maxio',
+    queryKey: [platformType || 'unknown', `products-${familyId}`, connectionId],
+    queryFn: fetchProductsFn,
+    enabled: platformType === 'maxio' || platformType === 'zuora',
   })
 
   if (isLoading) {

@@ -8,13 +8,13 @@ export const PaymentsNode = createContainerNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { connectionId, refreshQuery } = context
+    const { connectionId, platformType, refreshQuery } = context
 
-    if (connectionId) {
+    if (connectionId && platformType) {
       items.push({
         label: 'Refresh',
         icon: <RefreshCw size={14} />,
-        action: () => refreshQuery(['maxio', 'payments', String(connectionId)]),
+        action: () => refreshQuery([platformType, 'payments', String(connectionId)]),
       })
     }
 

@@ -4,11 +4,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Purpose
 
-This repository contains documentation and reference materials for payment platform APIs used at Sinch. The focus is on understanding and comparing three billing/payment platforms:
+Payment Billing Hub - a unified interface for managing connections to multiple billing/payment platforms:
 
-- **Zuora** - Enterprise subscription billing
-- **Stripe** - Payment processing and subscriptions
-- **Maxio (Chargify)** - SaaS subscription management
+- **Zuora** - Enterprise subscription billing (OAuth: client_id/client_secret)
+- **Stripe** - Payment processing and subscriptions (API key)
+- **Maxio (Chargify)** - SaaS subscription management (API key + subdomain)
+
+## Build & Development Commands
+
+### Frontend (React + Vite + TypeScript)
+```bash
+cd frontend
+npm install          # Install dependencies
+npm run dev          # Development server (hot reload)
+npm run build        # Production build (tsc + vite build)
+npm run lint         # ESLint
+```
+
+### Backend (Go 1.23)
+```bash
+cd backend
+go build ./...                           # Build all packages
+go build -o server ./cmd/server          # Build server binary
+go run ./cmd/server                      # Run server (requires DATABASE_URL or uses localhost:5432)
+```
+
+### Environment Variables
+- `DATABASE_URL` - PostgreSQL connection string (default: `postgres://localhost:5432/billing_hub?sslmode=disable`)
+- `PORT` - Backend server port (default: `8080`)
 
 ## Key Concepts
 
@@ -39,11 +62,56 @@ Customer and Product dialogs support both create and edit modes:
 - Create mode: Pass `connectionId` only
 - Edit mode: Pass `connectionId` + existing entity (`customer` or `product` prop)
 
-### API Endpoints (Maxio)
-- Customers: GET/POST list, GET/PUT individual (`/api/maxio/{connectionId}/customers/{customerId}`)
-- Products: GET/POST list, GET/PUT individual (`/api/maxio/{connectionId}/products/{productId}`)
+### API Endpoints
+
+**Maxio** (`/api/maxio/{connectionId}/...`)
+- Customers: GET/POST list, GET/PUT individual
+- Products: GET/POST list, GET/PUT individual
 - Subscriptions: GET/POST list, GET individual
 - Product Families: GET/POST list, GET products by family
+- Invoices, Payments: GET list
+
+**Zuora** (`/api/zuora/{connectionId}/...`)
+- Accounts: GET list, GET individual (maps to Customers in frontend)
+- Subscriptions: GET list, GET individual
+- Products: GET list, GET individual (maps to Product Families in frontend)
+- Product Rate Plans: GET by product (maps to Products in frontend)
+- Invoices, Payments: GET list
+
+### Backend Code Structure
+```
+backend/
+├── cmd/server/main.go           # Entry point, HTTP server setup
+└── internal/
+    ├── api/
+    │   ├── server.go            # Router, Server struct with client caches
+    │   ├── handlers.go          # Connection CRUD, tree structure, generic handlers
+    │   ├── handlers_maxio.go    # Maxio-specific API handlers
+    │   └── handlers_zuora.go    # Zuora-specific API handlers
+    ├── db/db.go                 # PostgreSQL connection, migrations
+    ├── models/models.go         # Shared types (TreeNode, CreateConnectionRequest, etc.)
+    └── platforms/
+        ├── maxio/               # Maxio API client + types
+        └── zuora/               # Zuora API client + types (OAuth token management)
+```
+
+### Frontend Code Structure
+```
+frontend/src/
+├── api.ts                       # All API calls (axios-based)
+├── App.tsx                      # Main app, dialogs, tree state management
+└── components/
+    ├── TreeView.tsx             # Tree rendering, lazy loading, context menus
+    ├── Toolbar.tsx              # Top toolbar (Add Connection, Help)
+    ├── nodes/                   # Node type handlers (icons, context menus, display names)
+    │   ├── index.ts             # Node registry mapping type → handler
+    │   ├── VendorNodes.tsx      # vendor-maxio, vendor-stripe, vendor-zuora
+    │   ├── PlatformNodes.tsx    # connection nodes
+    │   ├── CustomerNodes.tsx    # customers container + customer entities
+    │   ├── ProductNodes.tsx     # product-families, product-family, product
+    │   └── ...                  # SubscriptionNodes, InvoiceNodes, PaymentNodes
+    └── dialogs/                 # Modal dialogs for create/edit operations
+```
 
 ## Reference Materials
 
