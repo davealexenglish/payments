@@ -8,6 +8,7 @@ import (
 
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/models"
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/maxio"
+	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/zuora"
 )
 
 // Connection handlers
@@ -49,9 +50,28 @@ func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if req.Name == "" || req.APIKey == "" {
-		respondError(w, http.StatusBadRequest, "Name and API key are required")
+	if req.Name == "" {
+		respondError(w, http.StatusBadRequest, "Name is required")
 		return
+	}
+
+	// Validate credentials based on platform type
+	switch req.PlatformType {
+	case models.PlatformMaxio:
+		if req.APIKey == "" {
+			respondError(w, http.StatusBadRequest, "API key is required for Maxio")
+			return
+		}
+	case models.PlatformZuora:
+		if req.ClientID == "" || req.ClientSecret == "" {
+			respondError(w, http.StatusBadRequest, "Client ID and Client Secret are required for Zuora")
+			return
+		}
+	case models.PlatformStripe:
+		if req.APIKey == "" {
+			respondError(w, http.StatusBadRequest, "API key is required for Stripe")
+			return
+		}
 	}
 
 	ctx := context.Background()
@@ -74,11 +94,27 @@ func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Insert API key credential
-	_, err = tx.Exec(ctx, `
-		INSERT INTO platform_credentials (connection_id, credential_type, credential_value)
-		VALUES ($1, 'api_key', $2)
-	`, connID, req.APIKey)
+	// Insert credentials based on platform type
+	switch req.PlatformType {
+	case models.PlatformMaxio, models.PlatformStripe:
+		_, err = tx.Exec(ctx, `
+			INSERT INTO platform_credentials (connection_id, credential_type, credential_value)
+			VALUES ($1, 'api_key', $2)
+		`, connID, req.APIKey)
+	case models.PlatformZuora:
+		_, err = tx.Exec(ctx, `
+			INSERT INTO platform_credentials (connection_id, credential_type, credential_value)
+			VALUES ($1, 'client_id', $2)
+		`, connID, req.ClientID)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		_, err = tx.Exec(ctx, `
+			INSERT INTO platform_credentials (connection_id, credential_type, credential_value)
+			VALUES ($1, 'client_secret', $2)
+		`, connID, req.ClientSecret)
+	}
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -208,19 +244,45 @@ func (s *Server) handleTestConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := s.getMaxioClient(id)
+	// Get platform type
+	var platformType string
+	err = s.db.Pool().QueryRow(context.Background(), `
+		SELECT platform_type FROM platform_connections WHERE id = $1
+	`, id).Scan(&platformType)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if err := client.TestConnection(); err != nil {
+	// Test connection based on platform type
+	var testErr error
+	switch platformType {
+	case "maxio":
+		client, err := s.getMaxioClient(id)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		testErr = client.TestConnection()
+	case "zuora":
+		client, err := s.getZuoraClient(id)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		testErr = client.TestConnection()
+	default:
+		respondError(w, http.StatusBadRequest, "Unsupported platform type: "+platformType)
+		return
+	}
+
+	if testErr != nil {
 		// Update status to error
 		s.db.Pool().Exec(context.Background(), `
 			UPDATE platform_connections SET status = 'error', error_message = $1, updated_at = NOW()
 			WHERE id = $2
-		`, err.Error(), id)
-		respondError(w, http.StatusBadRequest, err.Error())
+		`, testErr.Error(), id)
+		respondError(w, http.StatusBadRequest, testErr.Error())
 		return
 	}
 
@@ -419,5 +481,53 @@ func (s *Server) getMaxioClient(connectionID int64) (*maxio.Client, error) {
 
 	client := maxio.NewClient(subdomain, apiKey)
 	s.maxioClients[connectionID] = client
+	return client, nil
+}
+
+// Helper to get or create Zuora client
+func (s *Server) getZuoraClient(connectionID int64) (*zuora.Client, error) {
+	if client, ok := s.zuoraClients[connectionID]; ok {
+		return client, nil
+	}
+
+	ctx := context.Background()
+
+	// Get connection details
+	var isSandbox bool
+	err := s.db.Pool().QueryRow(ctx, `
+		SELECT is_sandbox FROM platform_connections WHERE id = $1 AND platform_type = 'zuora'
+	`, connectionID).Scan(&isSandbox)
+	if err != nil {
+		return nil, err
+	}
+
+	// Determine base URL
+	baseURL := "https://rest.zuora.com"
+	if isSandbox {
+		baseURL = "https://rest.apisandbox.zuora.com"
+	}
+
+	// Get client_id
+	var clientID string
+	err = s.db.Pool().QueryRow(ctx, `
+		SELECT credential_value FROM platform_credentials
+		WHERE connection_id = $1 AND credential_type = 'client_id'
+	`, connectionID).Scan(&clientID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get client_secret
+	var clientSecret string
+	err = s.db.Pool().QueryRow(ctx, `
+		SELECT credential_value FROM platform_credentials
+		WHERE connection_id = $1 AND credential_type = 'client_secret'
+	`, connectionID).Scan(&clientSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	client := zuora.NewClient(baseURL, clientID, clientSecret)
+	s.zuoraClients[connectionID] = client
 	return client, nil
 }

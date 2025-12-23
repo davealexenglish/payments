@@ -9,9 +9,9 @@ export const ProductFamiliesNode = createContainerNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { connectionId, createProductFamily, refreshQuery } = context
+    const { connectionId, platformType, createProductFamily, refreshQuery } = context
 
-    if (connectionId) {
+    if (connectionId && platformType) {
       items.push({
         label: 'Create Product Family',
         icon: <Plus size={14} />,
@@ -20,7 +20,7 @@ export const ProductFamiliesNode = createContainerNodeHandler({
       items.push({
         label: 'Refresh',
         icon: <RefreshCw size={14} />,
-        action: () => refreshQuery(['maxio', 'product-families', String(connectionId)]),
+        action: () => refreshQuery([platformType, 'product-families', String(connectionId)]),
       })
     }
 
@@ -34,9 +34,9 @@ export const ProductFamilyNode = createExpandableEntityHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { node, connectionId, createProduct, refreshQuery } = context
+    const { node, connectionId, platformType, createProduct, refreshQuery } = context
 
-    if (connectionId && node.data) {
+    if (connectionId && platformType && node.data) {
       const family = node.data as ProductFamily
       items.push({
         label: 'Create Product',
@@ -46,7 +46,7 @@ export const ProductFamilyNode = createExpandableEntityHandler({
       items.push({
         label: 'Refresh',
         icon: <RefreshCw size={14} />,
-        action: () => refreshQuery(['maxio', `products-${family.id}`, String(connectionId)]),
+        action: () => refreshQuery([platformType, `products-${family.id}`, String(connectionId)]),
       })
     }
 

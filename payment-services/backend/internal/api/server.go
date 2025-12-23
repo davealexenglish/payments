@@ -6,12 +6,14 @@ import (
 
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/db"
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/maxio"
+	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/zuora"
 )
 
 // Server holds the API server state
 type Server struct {
 	db           *db.DB
 	maxioClients map[int64]*maxio.Client // connection_id -> client
+	zuoraClients map[int64]*zuora.Client // connection_id -> client
 }
 
 // NewServer creates a new API server
@@ -19,6 +21,7 @@ func NewServer(database *db.DB) *Server {
 	return &Server{
 		db:           database,
 		maxioClients: make(map[int64]*maxio.Client),
+		zuoraClients: make(map[int64]*zuora.Client),
 	}
 }
 
@@ -57,6 +60,17 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("POST /api/maxio/{connectionId}/product-families/{familyId}/products", s.handleMaxioCreateProduct)
 	mux.HandleFunc("GET /api/maxio/{connectionId}/invoices", s.handleMaxioListInvoices)
 	mux.HandleFunc("GET /api/maxio/{connectionId}/payments", s.handleMaxioListPayments)
+
+	// Zuora-specific endpoints
+	mux.HandleFunc("GET /api/zuora/{connectionId}/accounts", s.handleZuoraListAccounts)
+	mux.HandleFunc("GET /api/zuora/{connectionId}/accounts/{accountId}", s.handleZuoraGetAccount)
+	mux.HandleFunc("GET /api/zuora/{connectionId}/subscriptions", s.handleZuoraListSubscriptions)
+	mux.HandleFunc("GET /api/zuora/{connectionId}/subscriptions/{subscriptionId}", s.handleZuoraGetSubscription)
+	mux.HandleFunc("GET /api/zuora/{connectionId}/products", s.handleZuoraListProducts)
+	mux.HandleFunc("GET /api/zuora/{connectionId}/products/{productId}", s.handleZuoraGetProduct)
+	mux.HandleFunc("GET /api/zuora/{connectionId}/products/{productId}/rate-plans", s.handleZuoraListProductRatePlans)
+	mux.HandleFunc("GET /api/zuora/{connectionId}/invoices", s.handleZuoraListInvoices)
+	mux.HandleFunc("GET /api/zuora/{connectionId}/payments", s.handleZuoraListPayments)
 
 	// User preferences
 	mux.HandleFunc("GET /api/preferences/{key}", s.handleGetPreference)

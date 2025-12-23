@@ -9,9 +9,9 @@ export const SubscriptionsNode = createContainerNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { connectionId, createSubscription, refreshQuery } = context
+    const { connectionId, platformType, createSubscription, refreshQuery } = context
 
-    if (connectionId) {
+    if (connectionId && platformType) {
       items.push({
         label: 'Create Subscription',
         icon: <Plus size={14} />,
@@ -20,7 +20,7 @@ export const SubscriptionsNode = createContainerNodeHandler({
       items.push({
         label: 'Refresh',
         icon: <RefreshCw size={14} />,
-        action: () => refreshQuery(['maxio', 'subscriptions', String(connectionId)]),
+        action: () => refreshQuery([platformType, 'subscriptions', String(connectionId)]),
       })
     }
 
