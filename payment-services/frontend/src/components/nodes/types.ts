@@ -31,13 +31,13 @@ export interface NodeContext {
   toggleNode: (id: string) => void
   refreshQuery: (queryKey: string[]) => void
   // Dialog/action operations - Create
-  createCustomer: (connectionId: number) => void
-  createSubscription: (connectionId: number, customerId?: number) => void
-  createProductFamily: (connectionId: number) => void
-  createProduct: (connectionId: number, productFamily: ProductFamily) => void
+  createCustomer: (connectionId: number, platformType?: string) => void
+  createSubscription: (connectionId: number, customerId?: string, platformType?: string) => void
+  createProductFamily: (connectionId: number, platformType?: string) => void
+  createProduct: (connectionId: number, productFamily: ProductFamily, platformType?: string) => void
   // Dialog/action operations - Edit
-  editCustomer: (connectionId: number, customer: Customer) => void
-  editProduct: (connectionId: number, product: Product) => void
+  editCustomer: (connectionId: number, customer: Customer, platformType?: string) => void
+  editProduct: (connectionId: number, product: Product, platformType?: string) => void
   // Connection operations
   testConnection: (connectionId: number) => void
   deleteConnection: (connectionId: number) => void

@@ -15,7 +15,7 @@ export const ProductFamiliesNode = createContainerNodeHandler({
       items.push({
         label: 'Create Product Family',
         icon: <Plus size={14} />,
-        action: () => createProductFamily(connectionId),
+        action: () => createProductFamily(connectionId, platformType),
       })
       items.push({
         label: 'Refresh',
@@ -41,7 +41,7 @@ export const ProductFamilyNode = createExpandableEntityHandler({
       items.push({
         label: 'Create Product',
         icon: <Plus size={14} />,
-        action: () => createProduct(connectionId, family),
+        action: () => createProduct(connectionId, family, platformType),
       })
       items.push({
         label: 'Refresh',
@@ -68,14 +68,14 @@ export const ProductNode = createLeafNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { node, connectionId, editProduct } = context
+    const { node, connectionId, platformType, editProduct } = context
 
     if (connectionId && node.data) {
       const product = node.data as Product
       items.push({
         label: 'Edit Product',
         icon: <Pencil size={14} />,
-        action: () => editProduct(connectionId, product),
+        action: () => editProduct(connectionId, product, platformType),
       })
     }
 

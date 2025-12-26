@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api, { type Customer } from '../../api'
+import api, { type Customer, createStripeCustomer, updateStripeCustomer, createZuoraAccount } from '../../api'
 import { useToast } from '../Toast'
 
 interface CreateCustomerDialogProps {
   connectionId: number
+  platformType: string
   customer?: Customer // If provided, edit mode
   onClose: () => void
   onSuccess: () => void
 }
 
-export function CreateCustomerDialog({ connectionId, customer, onClose, onSuccess }: CreateCustomerDialogProps) {
+export function CreateCustomerDialog({ connectionId, platformType, customer, onClose, onSuccess }: CreateCustomerDialogProps) {
   const isEditMode = !!customer
   const [firstName, setFirstName] = useState(customer?.first_name || '')
   const [lastName, setLastName] = useState(customer?.last_name || '')
@@ -20,8 +21,14 @@ export function CreateCustomerDialog({ connectionId, customer, onClose, onSucces
   const { showToast } = useToast()
 
   const createMutation = useMutation({
-    mutationFn: (data: { first_name: string; last_name: string; email: string; organization?: string; reference?: string }) =>
-      api.createMaxioCustomer(connectionId, data),
+    mutationFn: (data: { first_name: string; last_name: string; email: string; organization?: string; reference?: string }) => {
+      if (platformType === 'stripe') {
+        return createStripeCustomer(connectionId, data)
+      } else if (platformType === 'zuora') {
+        return createZuoraAccount(connectionId, data)
+      }
+      return api.createMaxioCustomer(connectionId, data)
+    },
     onSuccess: () => {
       onSuccess()
     },
@@ -31,8 +38,12 @@ export function CreateCustomerDialog({ connectionId, customer, onClose, onSucces
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { first_name: string; last_name: string; email: string; organization?: string; reference?: string }) =>
-      api.updateMaxioCustomer(connectionId, customer!.id, data),
+    mutationFn: (data: { first_name: string; last_name: string; email: string; organization?: string; reference?: string }) => {
+      if (platformType === 'stripe') {
+        return updateStripeCustomer(connectionId, String(customer!.id), data)
+      }
+      return api.updateMaxioCustomer(connectionId, String(customer!.id), data)
+    },
     onSuccess: () => {
       onSuccess()
     },

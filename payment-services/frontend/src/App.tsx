@@ -38,19 +38,25 @@ function App() {
   const [connectionDialogPlatformType, setConnectionDialogPlatformType] = useState<PlatformConnection['platform_type'] | null>(null)
   const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false)
   const [createCustomerConnectionId, setCreateCustomerConnectionId] = useState<number | null>(null)
+  const [createCustomerPlatformType, setCreateCustomerPlatformType] = useState<string | null>(null)
   const [showCreateSubscriptionDialog, setShowCreateSubscriptionDialog] = useState(false)
   const [createSubscriptionConnectionId, setCreateSubscriptionConnectionId] = useState<number | null>(null)
-  const [createSubscriptionCustomerId, setCreateSubscriptionCustomerId] = useState<number | undefined>(undefined)
+  const [createSubscriptionCustomerId, setCreateSubscriptionCustomerId] = useState<string | undefined>(undefined)
+  const [createSubscriptionPlatformType, setCreateSubscriptionPlatformType] = useState<string | null>(null)
   const [showCreateProductFamilyDialog, setShowCreateProductFamilyDialog] = useState(false)
   const [createProductFamilyConnectionId, setCreateProductFamilyConnectionId] = useState<number | null>(null)
+  const [createProductFamilyPlatformType, setCreateProductFamilyPlatformType] = useState<string | null>(null)
   const [showCreateProductDialog, setShowCreateProductDialog] = useState(false)
   const [createProductConnectionId, setCreateProductConnectionId] = useState<number | null>(null)
   const [createProductFamily, setCreateProductFamily] = useState<ProductFamily | null>(null)
+  const [createProductPlatformType, setCreateProductPlatformType] = useState<string | null>(null)
   // Edit states
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
   const [editCustomerConnectionId, setEditCustomerConnectionId] = useState<number | null>(null)
+  const [editCustomerPlatformType, setEditCustomerPlatformType] = useState<string | null>(null)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [editProductConnectionId, setEditProductConnectionId] = useState<number | null>(null)
+  const [editProductPlatformType, setEditProductPlatformType] = useState<string | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef<string | null>(null)
@@ -77,37 +83,43 @@ function App() {
     document.body.style.userSelect = ''
   }, [])
 
-  const handleCreateCustomer = useCallback((connectionId: number) => {
+  const handleCreateCustomer = useCallback((connectionId: number, platformType?: string) => {
     setCreateCustomerConnectionId(connectionId)
+    setCreateCustomerPlatformType(platformType || null)
     setShowCreateCustomerDialog(true)
   }, [])
 
-  const handleCreateSubscription = useCallback((connectionId: number, customerId?: number) => {
+  const handleCreateSubscription = useCallback((connectionId: number, customerId?: string, platformType?: string) => {
     setCreateSubscriptionConnectionId(connectionId)
     setCreateSubscriptionCustomerId(customerId)
+    setCreateSubscriptionPlatformType(platformType || null)
     setShowCreateSubscriptionDialog(true)
   }, [])
 
-  const handleCreateProductFamily = useCallback((connectionId: number) => {
+  const handleCreateProductFamily = useCallback((connectionId: number, platformType?: string) => {
     setCreateProductFamilyConnectionId(connectionId)
+    setCreateProductFamilyPlatformType(platformType || null)
     setShowCreateProductFamilyDialog(true)
   }, [])
 
-  const handleCreateProduct = useCallback((connectionId: number, productFamily: ProductFamily) => {
+  const handleCreateProduct = useCallback((connectionId: number, productFamily: ProductFamily, platformType?: string) => {
     setCreateProductConnectionId(connectionId)
     setCreateProductFamily(productFamily)
+    setCreateProductPlatformType(platformType || null)
     setShowCreateProductDialog(true)
   }, [])
 
-  const handleEditCustomer = useCallback((connectionId: number, customer: Customer) => {
+  const handleEditCustomer = useCallback((connectionId: number, customer: Customer, platformType?: string) => {
     setEditCustomerConnectionId(connectionId)
     setEditCustomer(customer)
+    setEditCustomerPlatformType(platformType || null)
     setShowCreateCustomerDialog(true)
   }, [])
 
-  const handleEditProduct = useCallback((connectionId: number, product: Product) => {
+  const handleEditProduct = useCallback((connectionId: number, product: Product, platformType?: string) => {
     setEditProductConnectionId(connectionId)
     setEditProduct(product)
+    setEditProductPlatformType(platformType || null)
     setShowCreateProductDialog(true)
   }, [])
 
@@ -191,19 +203,25 @@ function App() {
         {showCreateCustomerDialog && (createCustomerConnectionId || editCustomerConnectionId) && (
           <CreateCustomerDialog
             connectionId={(editCustomerConnectionId || createCustomerConnectionId)!}
+            platformType={(editCustomerPlatformType || createCustomerPlatformType) || 'maxio'}
             customer={editCustomer || undefined}
             onClose={() => {
               setShowCreateCustomerDialog(false)
               setCreateCustomerConnectionId(null)
+              setCreateCustomerPlatformType(null)
               setEditCustomer(null)
               setEditCustomerConnectionId(null)
+              setEditCustomerPlatformType(null)
             }}
             onSuccess={() => {
               setShowCreateCustomerDialog(false)
               setCreateCustomerConnectionId(null)
+              setCreateCustomerPlatformType(null)
               setEditCustomer(null)
               setEditCustomerConnectionId(null)
-              queryClient.invalidateQueries({ queryKey: ['maxio', 'customers'] })
+              setEditCustomerPlatformType(null)
+              const pt = editCustomerPlatformType || createCustomerPlatformType || 'maxio'
+              queryClient.invalidateQueries({ queryKey: [pt, 'customers'] })
             }}
           />
         )}
@@ -212,17 +230,21 @@ function App() {
         {showCreateSubscriptionDialog && createSubscriptionConnectionId && (
           <CreateSubscriptionDialog
             connectionId={createSubscriptionConnectionId}
+            platformType={createSubscriptionPlatformType || 'maxio'}
             customerId={createSubscriptionCustomerId}
             onClose={() => {
               setShowCreateSubscriptionDialog(false)
               setCreateSubscriptionConnectionId(null)
               setCreateSubscriptionCustomerId(undefined)
+              setCreateSubscriptionPlatformType(null)
             }}
             onSuccess={() => {
               setShowCreateSubscriptionDialog(false)
               setCreateSubscriptionConnectionId(null)
               setCreateSubscriptionCustomerId(undefined)
-              queryClient.invalidateQueries({ queryKey: ['maxio', 'subscriptions'] })
+              const pt = createSubscriptionPlatformType || 'maxio'
+              setCreateSubscriptionPlatformType(null)
+              queryClient.invalidateQueries({ queryKey: [pt, 'subscriptions'] })
             }}
           />
         )}
@@ -231,14 +253,18 @@ function App() {
         {showCreateProductFamilyDialog && createProductFamilyConnectionId && (
           <CreateProductFamilyDialog
             connectionId={createProductFamilyConnectionId}
+            platformType={createProductFamilyPlatformType || 'maxio'}
             onClose={() => {
               setShowCreateProductFamilyDialog(false)
               setCreateProductFamilyConnectionId(null)
+              setCreateProductFamilyPlatformType(null)
             }}
             onSuccess={() => {
               setShowCreateProductFamilyDialog(false)
               setCreateProductFamilyConnectionId(null)
-              queryClient.invalidateQueries({ queryKey: ['maxio', 'product-families'] })
+              const pt = createProductFamilyPlatformType || 'maxio'
+              setCreateProductFamilyPlatformType(null)
+              queryClient.invalidateQueries({ queryKey: [pt, 'product-families'] })
             }}
           />
         )}
@@ -247,26 +273,32 @@ function App() {
         {showCreateProductDialog && ((createProductConnectionId && createProductFamily) || (editProductConnectionId && editProduct)) && (
           <CreateProductDialog
             connectionId={(editProductConnectionId || createProductConnectionId)!}
+            platformType={(editProductPlatformType || createProductPlatformType) || 'maxio'}
             productFamily={createProductFamily || undefined}
             product={editProduct || undefined}
             onClose={() => {
               setShowCreateProductDialog(false)
               setCreateProductConnectionId(null)
               setCreateProductFamily(null)
+              setCreateProductPlatformType(null)
               setEditProduct(null)
               setEditProductConnectionId(null)
+              setEditProductPlatformType(null)
             }}
             onSuccess={() => {
               setShowCreateProductDialog(false)
               setCreateProductConnectionId(null)
               const familyId = createProductFamily?.id || editProduct?.product_family?.id
+              const pt = editProductPlatformType || createProductPlatformType || 'maxio'
               setCreateProductFamily(null)
+              setCreateProductPlatformType(null)
               setEditProduct(null)
               setEditProductConnectionId(null)
+              setEditProductPlatformType(null)
               if (familyId) {
-                queryClient.invalidateQueries({ queryKey: ['maxio', `products-${familyId}`] })
+                queryClient.invalidateQueries({ queryKey: [pt, `products-${familyId}`] })
               }
-              queryClient.invalidateQueries({ queryKey: ['maxio', 'products'] })
+              queryClient.invalidateQueries({ queryKey: [pt, 'products'] })
             }}
           />
         )}
