@@ -1,14 +1,14 @@
 namespace: billing-hub
 
-# Image registry
-registry: 192.168.1.200:5000
+# Image registry (empty for local Docker Desktop images)
+registry: ""
 
 # Backend configuration
 backend:
   name: backend
   image:
     repository: payment-billing-hub-backend
-    tag: "0.1.8"
+    tag: "0.1.9"
     pullPolicy: IfNotPresent
   replicas: 1
   port: 8080
@@ -25,7 +25,7 @@ frontend:
   name: frontend
   image:
     repository: payment-billing-hub-frontend
-    tag: "0.1.14"
+    tag: "0.1.15"
     pullPolicy: IfNotPresent
   replicas: 1
   port: 80

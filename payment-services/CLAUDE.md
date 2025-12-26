@@ -138,29 +138,12 @@ frontend/src/
 - Stripe: https://stripe.com/docs/api
 - Maxio: https://developers.maxio.com/
 
-## Deployment (r740)
+## Deployment (Docker Desktop Kubernetes)
 
-### Target Server
-- **Server**: r740.webcentricds.net (Dell PowerEdge R740)
-- **IP**: 192.168.1.200
-- **Architecture**: linux/amd64 (x86_64)
-- **Kubernetes**: k3s cluster
-
-### Docker Registry
-- **Registry URL**: `192.168.1.200:5000`
-- **Protocol**: HTTP only (no HTTPS/TLS)
-- **Container**: registry:2 running on Docker
-- **Image naming**: `192.168.1.200:5000/<image-name>:<tag>`
-
-### Kubeconfig
-- **Config file**: `~/.kube/config-r740`
-- **Always use**: `--kubeconfig ~/.kube/config-r740` with kubectl/helm commands
-
-### Environment Variables
-Pre-configured via `/Users/denglish/gitDevelopment/github/davealexenglish/initScripts/davesMac/init_exports.sh`:
-- `KUBE_HOST=192.168.1.200`
-- `KUBE_USERNAME=denglish`
-- `KUBE_KUBECONFIG=~/.kube/config-r740`
+### Target Environment
+- **Platform**: Docker Desktop with Kubernetes enabled
+- **Context**: `docker-desktop`
+- **Registry**: Local images (no registry push required)
 
 ### Build & Deploy Commands
 
@@ -168,49 +151,54 @@ Pre-configured via `/Users/denglish/gitDevelopment/github/davealexenglish/initSc
 # Run from payment-services directory
 cd payment-services
 
-# 1. Build images for linux/amd64 (Dockerfiles are in deployments/docker/)
-docker build --platform linux/amd64 -f deployments/docker/Dockerfile.backend -t 192.168.1.200:5000/payment-billing-hub-backend:<VERSION> .
-docker build --platform linux/amd64 -f deployments/docker/Dockerfile.frontend -t 192.168.1.200:5000/payment-billing-hub-frontend:<VERSION> .
+# 1. Build images locally (Docker Desktop K8s uses local images)
+docker build -f deployments/docker/Dockerfile.backend -t payment-billing-hub-backend:<VERSION> .
+docker build -f deployments/docker/Dockerfile.frontend -t payment-billing-hub-frontend:<VERSION> .
 
-# 2. Push to registry
-docker push 192.168.1.200:5000/payment-billing-hub-backend:<VERSION>
-docker push 192.168.1.200:5000/payment-billing-hub-frontend:<VERSION>
-
-# 3. Update values.yaml with new version tags
+# 2. Update values.yaml with new version tags
 # Edit deployments/helm/payment-billing-hub/values.yaml:
 #   backend.image.tag: "<VERSION>"
 #   frontend.image.tag: "<VERSION>"
 
+# 3. Create namespace (first time only)
+kubectl create namespace billing-hub
+
 # 4. Deploy with Helm (release name is "billing-hub" in "billing-hub" namespace)
-helm upgrade billing-hub ./deployments/helm/payment-billing-hub \
-  --kubeconfig ~/.kube/config-r740 \
+helm upgrade --install billing-hub ./deployments/helm/payment-billing-hub \
   -n billing-hub \
   -f deployments/helm/payment-billing-hub/values.yaml
+
+# 5. Access the application (no ingress controller by default)
+kubectl port-forward -n billing-hub svc/frontend 8081:80
+# Then open http://localhost:8081
 ```
 
 ### Important Notes
-- Always build with `--platform linux/amd64` (r740 is x86_64, dev Mac may be ARM)
-- Registry uses HTTP, not HTTPS
+- Docker Desktop Kubernetes shares image store with Docker, so no registry push is needed
 - Dockerfiles are in `deployments/docker/` (not in backend/frontend dirs)
 - Helm chart is in `deployments/helm/payment-billing-hub/`
 - Build context must be `payment-services/` directory (Dockerfiles reference backend/ and frontend/ subdirs)
-- **Versioning**: Increment PATCH version only (0.1.2 → 0.1.3), not minor version
+- **Versioning**: Increment PATCH version only (0.1.2 → 0.1.3), never use `latest`
 - **Namespace**: Always use `billing-hub` namespace (helm release name is also `billing-hub`)
 - **Parallel builds**: Build frontend and backend images in parallel when both need to be built
+- **Image pull policy**: Uses `IfNotPresent` - always increment version when code changes
 
 ### Useful Commands
 
 ```bash
 # Check pod status
-kubectl get pods -n billing-hub --kubeconfig ~/.kube/config-r740
+kubectl get pods -n billing-hub
 
 # Check logs
-kubectl logs -n billing-hub -l app=backend --kubeconfig ~/.kube/config-r740
-kubectl logs -n billing-hub -l app=frontend --kubeconfig ~/.kube/config-r740
+kubectl logs -n billing-hub -l app=backend
+kubectl logs -n billing-hub -l app=frontend
 
 # List helm releases
-helm list -n billing-hub --kubeconfig ~/.kube/config-r740
+helm list -n billing-hub
 
 # Rollback if needed
-helm rollback billing-hub <REVISION> -n billing-hub --kubeconfig ~/.kube/config-r740
+helm rollback billing-hub <REVISION> -n billing-hub
+
+# Port-forward to access the app
+kubectl port-forward -n billing-hub svc/frontend 8081:80
 ```
