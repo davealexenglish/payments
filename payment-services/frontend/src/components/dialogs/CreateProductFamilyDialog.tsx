@@ -1,22 +1,30 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api from '../../api'
+import api, { createStripeProduct } from '../../api'
 
 interface CreateProductFamilyDialogProps {
   connectionId: number
+  platformType: string
   onClose: () => void
   onSuccess: () => void
 }
 
-export function CreateProductFamilyDialog({ connectionId, onClose, onSuccess }: CreateProductFamilyDialogProps) {
+export function CreateProductFamilyDialog({ connectionId, platformType, onClose, onSuccess }: CreateProductFamilyDialogProps) {
   const [name, setName] = useState('')
   const [handle, setHandle] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  // For Stripe, "Product Family" maps to creating a Product (which can have multiple Prices)
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; handle?: string; description?: string }) =>
-      api.createMaxioProductFamily(connectionId, data),
+    mutationFn: (data: { name: string; handle?: string; description?: string }) => {
+      if (platformType === 'stripe') {
+        return createStripeProduct(connectionId, { name: data.name, description: data.description })
+      }
+      // Zuora doesn't support creating products via API in the same way
+      // For now, only Maxio and Stripe are supported
+      return api.createMaxioProductFamily(connectionId, data)
+    },
     onSuccess: () => {
       onSuccess()
     },

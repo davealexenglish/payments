@@ -33,7 +33,7 @@ export interface TreeNode {
 }
 
 export interface Customer {
-  id: number
+  id: string
   first_name: string
   last_name: string
   email: string
@@ -43,7 +43,7 @@ export interface Customer {
 }
 
 export interface Subscription {
-  id: number
+  id: string
   state: string
   customer?: Customer
   product?: Product
@@ -53,7 +53,7 @@ export interface Subscription {
 }
 
 export interface Product {
-  id: number
+  id: string
   name: string
   handle?: string
   description?: string
@@ -64,7 +64,7 @@ export interface Product {
 }
 
 export interface ProductFamily {
-  id: number
+  id: string
   name: string
   handle?: string
   description?: string
@@ -173,7 +173,7 @@ export const getMaxioCustomer = async (connectionId: number, customerId: string)
   return response.data
 }
 
-export const updateMaxioCustomer = async (connectionId: number, customerId: number, req: CreateCustomerRequest): Promise<Customer> => {
+export const updateMaxioCustomer = async (connectionId: number, customerId: string, req: CreateCustomerRequest): Promise<Customer> => {
   const response = await api.put(`/api/maxio/${connectionId}/customers/${customerId}`, req)
   return response.data
 }
@@ -203,22 +203,22 @@ export const createMaxioProductFamily = async (connectionId: number, req: Create
   return response.data
 }
 
-export const listMaxioProductsByFamily = async (connectionId: number, familyId: number): Promise<Product[]> => {
+export const listMaxioProductsByFamily = async (connectionId: number, familyId: string): Promise<Product[]> => {
   const response = await api.get(`/api/maxio/${connectionId}/product-families/${familyId}/products`)
   return response.data || []
 }
 
-export const createMaxioProduct = async (connectionId: number, familyId: number, req: CreateProductRequest): Promise<Product> => {
+export const createMaxioProduct = async (connectionId: number, familyId: string, req: CreateProductRequest): Promise<Product> => {
   const response = await api.post(`/api/maxio/${connectionId}/product-families/${familyId}/products`, req)
   return response.data
 }
 
-export const getMaxioProduct = async (connectionId: number, productId: number): Promise<Product> => {
+export const getMaxioProduct = async (connectionId: number, productId: string): Promise<Product> => {
   const response = await api.get(`/api/maxio/${connectionId}/products/${productId}`)
   return response.data
 }
 
-export const updateMaxioProduct = async (connectionId: number, productId: number, req: CreateProductRequest): Promise<Product> => {
+export const updateMaxioProduct = async (connectionId: number, productId: string, req: CreateProductRequest): Promise<Product> => {
   const response = await api.put(`/api/maxio/${connectionId}/products/${productId}`, req)
   return response.data
 }
@@ -261,7 +261,7 @@ export const listZuoraProductCatalogs = async (connectionId: number): Promise<Pr
   return response.data || []
 }
 
-export const listZuoraProductsByRatePlan = async (connectionId: number, productId: number): Promise<Product[]> => {
+export const listZuoraProductsByRatePlan = async (connectionId: number, productId: string): Promise<Product[]> => {
   const response = await api.get(`/api/zuora/${connectionId}/products/${productId}/rate-plans`)
   return response.data || []
 }
@@ -269,6 +269,144 @@ export const listZuoraProductsByRatePlan = async (connectionId: number, productI
 export const listZuoraInvoices = async (connectionId: number): Promise<Invoice[]> => {
   const response = await api.get(`/api/zuora/${connectionId}/invoices`)
   return response.data || []
+}
+
+// Stripe APIs
+export const listStripeCustomers = async (connectionId: number): Promise<Customer[]> => {
+  const response = await api.get(`/api/stripe/${connectionId}/customers`)
+  // Map Stripe customer format to our Customer interface
+  return (response.data || []).map((c: { id: string; name?: string; email?: string; created?: number }) => ({
+    id: c.id,
+    first_name: c.name?.split(' ')[0] || '',
+    last_name: c.name?.split(' ').slice(1).join(' ') || '',
+    email: c.email || '',
+    created_at: c.created ? new Date(c.created * 1000).toISOString() : undefined,
+  }))
+}
+
+export const createStripeCustomer = async (connectionId: number, req: CreateCustomerRequest): Promise<Customer> => {
+  const stripeReq = {
+    name: `${req.first_name} ${req.last_name}`.trim(),
+    email: req.email,
+    description: req.organization,
+  }
+  const response = await api.post(`/api/stripe/${connectionId}/customers`, stripeReq)
+  const c = response.data
+  return {
+    id: c.id,
+    first_name: c.name?.split(' ')[0] || '',
+    last_name: c.name?.split(' ').slice(1).join(' ') || '',
+    email: c.email || '',
+  }
+}
+
+export const updateStripeCustomer = async (connectionId: number, customerId: string, req: CreateCustomerRequest): Promise<Customer> => {
+  const stripeReq = {
+    name: `${req.first_name} ${req.last_name}`.trim(),
+    email: req.email,
+    description: req.organization,
+  }
+  const response = await api.put(`/api/stripe/${connectionId}/customers/${customerId}`, stripeReq)
+  const c = response.data
+  return {
+    id: c.id,
+    first_name: c.name?.split(' ')[0] || '',
+    last_name: c.name?.split(' ').slice(1).join(' ') || '',
+    email: c.email || '',
+  }
+}
+
+export const createStripeProduct = async (connectionId: number, req: { name: string; description?: string }): Promise<ProductFamily> => {
+  const response = await api.post(`/api/stripe/${connectionId}/products`, req)
+  const p = response.data
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+  }
+}
+
+export const listStripeSubscriptions = async (connectionId: number): Promise<Subscription[]> => {
+  const response = await api.get(`/api/stripe/${connectionId}/subscriptions`)
+  return (response.data || []).map((s: { id: string; status: string; created?: number }) => ({
+    id: s.id,
+    state: s.status,
+    created_at: s.created ? new Date(s.created * 1000).toISOString() : undefined,
+  }))
+}
+
+export const createStripeSubscription = async (
+  connectionId: number,
+  customerId: string,
+  priceId: string
+): Promise<Subscription> => {
+  const response = await api.post(`/api/stripe/${connectionId}/subscriptions`, {
+    customer_id: customerId,
+    price_id: priceId,
+  })
+  const s = response.data
+  return {
+    id: s.id,
+    state: s.status,
+    created_at: s.created ? new Date(s.created * 1000).toISOString() : undefined,
+  }
+}
+
+export const listStripeProducts = async (connectionId: number): Promise<ProductFamily[]> => {
+  const response = await api.get(`/api/stripe/${connectionId}/products`)
+  // Map Stripe products to ProductFamily (products are top-level in Stripe)
+  return (response.data || []).map((p: { id: string; name: string; description?: string; created?: number }) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    created_at: p.created ? new Date(p.created * 1000).toISOString() : undefined,
+  }))
+}
+
+export const listStripePrices = async (connectionId: number, productId: string): Promise<Product[]> => {
+  const response = await api.get(`/api/stripe/${connectionId}/prices?product=${productId}`)
+  return (response.data || []).map((p: { id: string; unit_amount: number; currency: string; recurring?: { interval: string; interval_count: number } }) => ({
+    id: p.id,
+    name: `${p.currency.toUpperCase()} ${(p.unit_amount / 100).toFixed(2)}${p.recurring ? ` / ${p.recurring.interval}` : ''}`,
+    price_in_cents: p.unit_amount,
+    interval: p.recurring?.interval_count || 1,
+    interval_unit: p.recurring?.interval || 'one_time',
+  }))
+}
+
+export const createStripePrice = async (
+  connectionId: number,
+  productId: string,
+  req: { price_in_cents: number; interval: number; interval_unit: string }
+): Promise<Product> => {
+  const response = await api.post(`/api/stripe/${connectionId}/prices`, {
+    product_id: productId,
+    unit_amount: req.price_in_cents,
+    currency: 'usd',
+    interval: req.interval_unit,
+    interval_count: req.interval,
+  })
+  const p = response.data
+  return {
+    id: p.id,
+    name: `USD ${(p.unit_amount / 100).toFixed(2)}${p.recurring ? ` / ${p.recurring.interval}` : ''}`,
+    price_in_cents: p.unit_amount,
+    interval: p.recurring?.interval_count || 1,
+    interval_unit: p.recurring?.interval || 'one_time',
+  }
+}
+
+export const listStripeInvoices = async (connectionId: number): Promise<Invoice[]> => {
+  const response = await api.get(`/api/stripe/${connectionId}/invoices`)
+  return (response.data || []).map((i: { id: string; number?: string; customer: string; status: string; total: number; due_date?: number; created?: number }) => ({
+    uid: i.id,
+    number: i.number || i.id,
+    customer_id: i.customer,
+    status: i.status,
+    total_amount: String(i.total / 100),
+    due_date: i.due_date ? new Date(i.due_date * 1000).toISOString() : undefined,
+    created_at: i.created ? new Date(i.created * 1000).toISOString() : undefined,
+  }))
 }
 
 export default {
@@ -301,4 +439,13 @@ export default {
   listZuoraProductCatalogs,
   listZuoraProductsByRatePlan,
   listZuoraInvoices,
+  // Stripe
+  listStripeCustomers,
+  createStripeCustomer,
+  updateStripeCustomer,
+  listStripeSubscriptions,
+  listStripeProducts,
+  createStripeProduct,
+  listStripePrices,
+  listStripeInvoices,
 }

@@ -6,22 +6,25 @@ import (
 
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/db"
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/maxio"
+	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/stripe"
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/zuora"
 )
 
 // Server holds the API server state
 type Server struct {
-	db           *db.DB
-	maxioClients map[int64]*maxio.Client // connection_id -> client
-	zuoraClients map[int64]*zuora.Client // connection_id -> client
+	db            *db.DB
+	maxioClients  map[int64]*maxio.Client  // connection_id -> client
+	stripeClients map[int64]*stripe.Client // connection_id -> client
+	zuoraClients  map[int64]*zuora.Client  // connection_id -> client
 }
 
 // NewServer creates a new API server
 func NewServer(database *db.DB) *Server {
 	return &Server{
-		db:           database,
-		maxioClients: make(map[int64]*maxio.Client),
-		zuoraClients: make(map[int64]*zuora.Client),
+		db:            database,
+		maxioClients:  make(map[int64]*maxio.Client),
+		stripeClients: make(map[int64]*stripe.Client),
+		zuoraClients:  make(map[int64]*zuora.Client),
 	}
 }
 
@@ -71,6 +74,23 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("GET /api/zuora/{connectionId}/products/{productId}/rate-plans", s.handleZuoraListProductRatePlans)
 	mux.HandleFunc("GET /api/zuora/{connectionId}/invoices", s.handleZuoraListInvoices)
 	mux.HandleFunc("GET /api/zuora/{connectionId}/payments", s.handleZuoraListPayments)
+
+	// Stripe-specific endpoints
+	mux.HandleFunc("GET /api/stripe/{connectionId}/customers", s.handleStripeListCustomers)
+	mux.HandleFunc("POST /api/stripe/{connectionId}/customers", s.handleStripeCreateCustomer)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/customers/{customerId}", s.handleStripeGetCustomer)
+	mux.HandleFunc("PUT /api/stripe/{connectionId}/customers/{customerId}", s.handleStripeUpdateCustomer)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/subscriptions", s.handleStripeListSubscriptions)
+	mux.HandleFunc("POST /api/stripe/{connectionId}/subscriptions", s.handleStripeCreateSubscription)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/subscriptions/{subscriptionId}", s.handleStripeGetSubscription)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/products", s.handleStripeListProducts)
+	mux.HandleFunc("POST /api/stripe/{connectionId}/products", s.handleStripeCreateProduct)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/products/{productId}", s.handleStripeGetProduct)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/prices", s.handleStripeListPrices)
+	mux.HandleFunc("POST /api/stripe/{connectionId}/prices", s.handleStripeCreatePrice)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/invoices", s.handleStripeListInvoices)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/invoices/{invoiceId}", s.handleStripeGetInvoice)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/payments", s.handleStripeListPayments)
 
 	// User preferences
 	mux.HandleFunc("GET /api/preferences/{key}", s.handleGetPreference)

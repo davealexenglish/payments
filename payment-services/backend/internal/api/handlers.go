@@ -8,6 +8,7 @@ import (
 
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/models"
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/maxio"
+	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/stripe"
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/zuora"
 )
 
@@ -211,8 +212,9 @@ func (s *Server) handleUpdateConnection(w http.ResponseWriter, r *http.Request) 
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		// Clear cached client
+		// Clear cached clients
 		delete(s.maxioClients, id)
+		delete(s.stripeClients, id)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "updated"})
@@ -233,6 +235,8 @@ func (s *Server) handleDeleteConnection(w http.ResponseWriter, r *http.Request) 
 	}
 
 	delete(s.maxioClients, id)
+	delete(s.stripeClients, id)
+	delete(s.zuoraClients, id)
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -259,6 +263,13 @@ func (s *Server) handleTestConnection(w http.ResponseWriter, r *http.Request) {
 	switch platformType {
 	case "maxio":
 		client, err := s.getMaxioClient(id)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		testErr = client.TestConnection()
+	case "stripe":
+		client, err := s.getStripeClient(id)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -529,5 +540,28 @@ func (s *Server) getZuoraClient(connectionID int64) (*zuora.Client, error) {
 
 	client := zuora.NewClient(baseURL, clientID, clientSecret)
 	s.zuoraClients[connectionID] = client
+	return client, nil
+}
+
+// Helper to get or create Stripe client
+func (s *Server) getStripeClient(connectionID int64) (*stripe.Client, error) {
+	if client, ok := s.stripeClients[connectionID]; ok {
+		return client, nil
+	}
+
+	ctx := context.Background()
+
+	// Get API key
+	var apiKey string
+	err := s.db.Pool().QueryRow(ctx, `
+		SELECT credential_value FROM platform_credentials
+		WHERE connection_id = $1 AND credential_type = 'api_key'
+	`, connectionID).Scan(&apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	client := stripe.NewClient(apiKey)
+	s.stripeClients[connectionID] = client
 	return client, nil
 }

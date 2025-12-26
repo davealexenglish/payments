@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api, { type ProductFamily, type Product } from '../../api'
+import api, { type ProductFamily, type Product, createStripePrice } from '../../api'
 import { useToast } from '../Toast'
 
 interface CreateProductDialogProps {
   connectionId: number
-  productFamily?: ProductFamily // Required for create mode
+  platformType: string
+  productFamily?: ProductFamily // Required for create mode (in Stripe, this is the Product)
   product?: Product // If provided, edit mode
   onClose: () => void
   onSuccess: () => void
 }
 
-export function CreateProductDialog({ connectionId, productFamily, product, onClose, onSuccess }: CreateProductDialogProps) {
+export function CreateProductDialog({ connectionId, platformType, productFamily, product, onClose, onSuccess }: CreateProductDialogProps) {
   const isEditMode = !!product
   const [name, setName] = useState(product?.name || '')
   const [handle, setHandle] = useState(product?.handle || '')
@@ -21,12 +22,24 @@ export function CreateProductDialog({ connectionId, productFamily, product, onCl
   const [intervalUnit, setIntervalUnit] = useState(product?.interval_unit || 'month')
   const { showToast } = useToast()
 
-  // Get family name for display
+  // Get family name for display (in Stripe, this is the Product name)
   const familyName = isEditMode ? product?.product_family?.name : productFamily?.name
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; handle?: string; description?: string; price_in_cents: number; interval: number; interval_unit: string }) =>
-      api.createMaxioProduct(connectionId, productFamily!.id, data),
+    mutationFn: (data: { name: string; handle?: string; description?: string; price_in_cents: number; interval: number; interval_unit: string }) => {
+      if (platformType === 'stripe') {
+        // For Stripe, create a Price under the Product (productFamily is the Stripe Product)
+        return createStripePrice(connectionId, String(productFamily!.id), {
+          price_in_cents: data.price_in_cents,
+          interval: data.interval,
+          interval_unit: data.interval_unit,
+        })
+      }
+      if (platformType !== 'maxio') {
+        throw new Error(`Product creation for ${platformType} is not yet fully implemented`)
+      }
+      return api.createMaxioProduct(connectionId, String(productFamily!.id), data)
+    },
     onSuccess: () => {
       onSuccess()
     },
@@ -36,8 +49,12 @@ export function CreateProductDialog({ connectionId, productFamily, product, onCl
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: { name: string; handle?: string; description?: string; price_in_cents: number; interval: number; interval_unit: string }) =>
-      api.updateMaxioProduct(connectionId, product!.id, data),
+    mutationFn: (data: { name: string; handle?: string; description?: string; price_in_cents: number; interval: number; interval_unit: string }) => {
+      if (platformType !== 'maxio') {
+        throw new Error(`Product update for ${platformType} is not yet fully implemented`)
+      }
+      return api.updateMaxioProduct(connectionId, String(product!.id), data)
+    },
     onSuccess: () => {
       onSuccess()
     },

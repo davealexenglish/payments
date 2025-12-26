@@ -1,20 +1,21 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import api, { type Customer, type Product } from '../../api'
+import api, { type Customer, type Product, listStripeCustomers, listStripePrices, listStripeProducts, listZuoraAccounts, createStripeSubscription } from '../../api'
 import { useToast } from '../Toast'
 
 interface CreateSubscriptionDialogProps {
   connectionId: number
-  customerId?: number
+  platformType: string
+  customerId?: string
   onClose: () => void
   onSuccess: () => void
 }
 
 type PaymentMethod = 'credit_card' | 'invoice'
 
-export function CreateSubscriptionDialog({ connectionId, customerId: preselectedCustomerId, onClose, onSuccess }: CreateSubscriptionDialogProps) {
-  const [customerId, setCustomerId] = useState<number | ''>(preselectedCustomerId || '')
-  const [productId, setProductId] = useState<number | ''>('')
+export function CreateSubscriptionDialog({ connectionId, platformType, customerId: preselectedCustomerId, onClose, onSuccess }: CreateSubscriptionDialogProps) {
+  const [customerId, setCustomerId] = useState<string>(preselectedCustomerId || '')
+  const [productId, setProductId] = useState<string>('')
   const [couponCode, setCouponCode] = useState('')
   const [reference, setReference] = useState('')
   const { showToast } = useToast()
@@ -28,27 +29,54 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
 
   // Fetch customers for dropdown (only if no preselected customer)
   const { data: customers, isLoading: loadingCustomers } = useQuery({
-    queryKey: ['maxio', 'customers', connectionId],
-    queryFn: () => api.listMaxioCustomers(connectionId),
+    queryKey: [platformType, 'customers', connectionId],
+    queryFn: () => {
+      if (platformType === 'stripe') {
+        return listStripeCustomers(connectionId)
+      } else if (platformType === 'zuora') {
+        return listZuoraAccounts(connectionId)
+      }
+      return api.listMaxioCustomers(connectionId)
+    },
     enabled: !preselectedCustomerId,
   })
 
-  // Fetch products for dropdown
+  // Fetch products for dropdown - for Stripe we need to get products and their prices
   const { data: products, isLoading: loadingProducts } = useQuery({
-    queryKey: ['maxio', 'products', connectionId],
-    queryFn: () => api.listMaxioProducts(connectionId),
+    queryKey: [platformType, 'products', connectionId],
+    queryFn: async () => {
+      if (platformType === 'stripe') {
+        // Get all products first, then get prices for each
+        const stripeProducts = await listStripeProducts(connectionId)
+        const productsWithPrices: Product[] = []
+        for (const p of stripeProducts) {
+          const prices = await listStripePrices(connectionId, String(p.id))
+          productsWithPrices.push(...prices)
+        }
+        return productsWithPrices
+      }
+      return api.listMaxioProducts(connectionId)
+    },
   })
 
   // Get preselected customer details
   const { data: preselectedCustomer } = useQuery({
-    queryKey: ['maxio', 'customer', connectionId, preselectedCustomerId],
+    queryKey: [platformType, 'customer', connectionId, preselectedCustomerId],
     queryFn: () => api.getMaxioCustomer(connectionId, String(preselectedCustomerId)),
-    enabled: !!preselectedCustomerId,
+    enabled: !!preselectedCustomerId && platformType === 'maxio',
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: Parameters<typeof api.createMaxioSubscription>[1]) =>
-      api.createMaxioSubscription(connectionId, data),
+    mutationFn: (data: Parameters<typeof api.createMaxioSubscription>[1] & { price_id?: string }) => {
+      if (platformType === 'stripe') {
+        // Stripe uses customer_id and price_id
+        return createStripeSubscription(connectionId, String(data.customer_id), data.price_id || String(data.product_id))
+      }
+      if (platformType === 'zuora') {
+        throw new Error(`Subscription creation for ${platformType} is not yet implemented`)
+      }
+      return api.createMaxioSubscription(connectionId, data)
+    },
     onSuccess: () => {
       onSuccess()
     },
@@ -70,8 +98,8 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
       return
     }
 
-    // Validate credit card if that payment method is selected
-    if (paymentMethod === 'credit_card') {
+    // Validate credit card if that payment method is selected (not for Stripe)
+    if (platformType !== 'stripe' && paymentMethod === 'credit_card') {
       if (!cardNumber.trim()) {
         showToast('Card number is required', 'error')
         return
@@ -91,6 +119,14 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
         showToast('Credit card has expired. Please use a valid card.', 'error')
         return
       }
+    }
+
+    if (platformType === 'stripe') {
+      // Stripe subscription just needs customer and price (both are string IDs)
+      createStripeSubscription(connectionId, customerId, productId)
+        .then(() => onSuccess())
+        .catch((err) => showToast(err, 'error'))
+      return
     }
 
     const requestData: Parameters<typeof api.createMaxioSubscription>[1] = {
@@ -141,7 +177,7 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
                 <select
                   className="form-input"
                   value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : '')}
+                  onChange={(e) => setCustomerId(e.target.value)}
                   disabled={loadingCustomers}
                 >
                   <option value="">Select a customer...</option>
@@ -160,7 +196,7 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
               <select
                 className="form-input"
                 value={productId}
-                onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) => setProductId(e.target.value)}
                 disabled={loadingProducts}
               >
                 <option value="">Select a product...</option>
@@ -203,19 +239,27 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Payment Method *</label>
-              <select
-                className="form-input"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-              >
-                <option value="credit_card">Credit Card</option>
-                <option value="invoice">Invoice (no card required)</option>
-              </select>
-            </div>
+            {platformType === 'stripe' && (
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '8px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', marginBottom: '12px' }}>
+                Stripe subscriptions use payment methods attached to the customer. In test mode, subscriptions are created directly.
+              </div>
+            )}
 
-            {paymentMethod === 'credit_card' && (
+            {platformType !== 'stripe' && (
+              <div className="form-group">
+                <label className="form-label">Payment Method *</label>
+                <select
+                  className="form-input"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                >
+                  <option value="credit_card">Credit Card</option>
+                  <option value="invoice">Invoice (no card required)</option>
+                </select>
+              </div>
+            )}
+
+            {platformType !== 'stripe' && paymentMethod === 'credit_card' && (
               <>
                 <div className="form-group">
                   <label className="form-label">Card Number *</label>
@@ -277,7 +321,7 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
               </>
             )}
 
-            {paymentMethod === 'invoice' && (
+            {platformType !== 'stripe' && paymentMethod === 'invoice' && (
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '8px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px' }}>
                 Invoice billing: Customer will be invoiced and can pay later. No credit card required.
               </div>
@@ -294,7 +338,7 @@ export function CreateSubscriptionDialog({ connectionId, customerId: preselected
                 createMutation.isPending ||
                 !customerId ||
                 !productId ||
-                (paymentMethod === 'credit_card' && (!cardNumber.trim() || !expirationMonth || !expirationYear))
+                (platformType !== 'stripe' && paymentMethod === 'credit_card' && (!cardNumber.trim() || !expirationMonth || !expirationYear))
               }
             >
               {createMutation.isPending ? 'Creating...' : 'Create Subscription'}

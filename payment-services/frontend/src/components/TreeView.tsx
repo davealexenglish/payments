@@ -7,12 +7,12 @@ import { getNodeHandler, type TreeNodeData, type NodeContext, type MenuItem } fr
 
 interface TreeViewProps {
   onSelectNode: (node: SelectedNode) => void
-  onCreateCustomer: (connectionId: number) => void
-  onCreateSubscription: (connectionId: number, customerId?: number) => void
-  onCreateProductFamily: (connectionId: number) => void
-  onCreateProduct: (connectionId: number, productFamily: ProductFamily) => void
-  onEditCustomer: (connectionId: number, customer: Customer) => void
-  onEditProduct: (connectionId: number, product: Product) => void
+  onCreateCustomer: (connectionId: number, platformType?: string) => void
+  onCreateSubscription: (connectionId: number, customerId?: string, platformType?: string) => void
+  onCreateProductFamily: (connectionId: number, platformType?: string) => void
+  onCreateProduct: (connectionId: number, productFamily: ProductFamily, platformType?: string) => void
+  onEditCustomer: (connectionId: number, customer: Customer, platformType?: string) => void
+  onEditProduct: (connectionId: number, product: Product, platformType?: string) => void
 }
 
 interface ContextMenuState {
@@ -300,6 +300,19 @@ function LazyEntityList({
         default:
           return []
       }
+    } else if (platformType === 'stripe') {
+      switch (type) {
+        case 'customers':
+          return api.listStripeCustomers(connectionId)
+        case 'subscriptions':
+          return api.listStripeSubscriptions(connectionId)
+        case 'product-families':
+          return api.listStripeProducts(connectionId)
+        case 'invoices':
+          return api.listStripeInvoices(connectionId)
+        default:
+          return []
+      }
     }
     return []
   }, [type, connectionId, platformType])
@@ -307,7 +320,7 @@ function LazyEntityList({
   const { data, isLoading, error } = useQuery<EntityItem[]>({
     queryKey: [platformType || 'unknown', type, connectionId],
     queryFn: fetchFn,
-    enabled: platformType === 'maxio' || platformType === 'zuora',
+    enabled: platformType === 'maxio' || platformType === 'zuora' || platformType === 'stripe',
   })
 
   if (isLoading) {
@@ -398,7 +411,7 @@ function LazyEntityList({
             {isExpandable && isExpanded && entityType === 'product-family' && (
               <ProductsList
                 connectionId={connectionId}
-                familyId={Number(itemId)}
+                familyId={itemId}
                 platformType={platformType}
                 depth={depth + 1}
                 selectedNodeId={selectedNodeId}
@@ -416,7 +429,7 @@ function LazyEntityList({
 // Separate component for loading products within a product family
 interface ProductsListProps {
   connectionId: number
-  familyId: number
+  familyId: string
   platformType?: string
   depth: number
   selectedNodeId: string | null
@@ -440,6 +453,8 @@ function ProductsList({
       return api.listMaxioProductsByFamily(connectionId, familyId)
     } else if (platformType === 'zuora') {
       return api.listZuoraProductsByRatePlan(connectionId, familyId)
+    } else if (platformType === 'stripe') {
+      return api.listStripePrices(connectionId, familyId)
     }
     return []
   }, [connectionId, familyId, platformType])
@@ -447,7 +462,7 @@ function ProductsList({
   const { data, isLoading, error } = useQuery<Product[]>({
     queryKey: [platformType || 'unknown', `products-${familyId}`, connectionId],
     queryFn: fetchProductsFn,
-    enabled: platformType === 'maxio' || platformType === 'zuora',
+    enabled: platformType === 'maxio' || platformType === 'zuora' || platformType === 'stripe',
   })
 
   if (isLoading) {

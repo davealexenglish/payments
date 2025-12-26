@@ -15,7 +15,7 @@ export const SubscriptionsNode = createContainerNodeHandler({
       items.push({
         label: 'Create Subscription',
         icon: <Plus size={14} />,
-        action: () => createSubscription(connectionId),
+        action: () => createSubscription(connectionId, undefined, platformType),
       })
       items.push({
         label: 'Refresh',

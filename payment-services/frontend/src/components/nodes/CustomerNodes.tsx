@@ -15,7 +15,7 @@ export const CustomersNode = createContainerNodeHandler({
       items.push({
         label: 'Create Customer',
         icon: <Plus size={14} />,
-        action: () => createCustomer(connectionId),
+        action: () => createCustomer(connectionId, platformType),
       })
       items.push({
         label: 'Refresh',
@@ -34,19 +34,19 @@ export const CustomerNode = createLeafNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { node, connectionId, createSubscription, editCustomer } = context
+    const { node, connectionId, platformType, createSubscription, editCustomer } = context
 
     if (connectionId && node.data) {
       const customer = node.data as Customer
       items.push({
         label: 'Edit Customer',
         icon: <Pencil size={14} />,
-        action: () => editCustomer(connectionId, customer),
+        action: () => editCustomer(connectionId, customer, platformType),
       })
       items.push({
         label: 'Create Subscription',
         icon: <Plus size={14} />,
-        action: () => createSubscription(connectionId, customer.id),
+        action: () => createSubscription(connectionId, customer.id, platformType),
       })
     }
 
