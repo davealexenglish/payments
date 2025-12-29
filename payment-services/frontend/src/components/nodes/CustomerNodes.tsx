@@ -56,7 +56,15 @@ export const CustomerNode = createLeafNodeHandler({
   getDisplayName: (node: TreeNodeData): string => {
     if (node.data) {
       const customer = node.data as Customer
-      return customer.email || `${customer.first_name} ${customer.last_name}`
+      // Prefer organization, then email, then name
+      if (customer.organization) {
+        return customer.organization
+      }
+      if (customer.email) {
+        return customer.email
+      }
+      const name = `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
+      return name || customer.id
     }
     return node.name
   },

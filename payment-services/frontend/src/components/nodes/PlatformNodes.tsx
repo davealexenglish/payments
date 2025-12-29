@@ -1,6 +1,6 @@
-import { Database, Link, TestTube, Trash2 } from 'lucide-react'
+import { Database, Link, TestTube, Trash2, Settings } from 'lucide-react'
 import { createContainerNodeHandler } from './BaseNode'
-import type { MenuItem, NodeContext } from './types'
+import type { MenuItem, NodeContext, ConnectionData } from './types'
 
 // Platform connection node (e.g., "Maxio Sandbox") - legacy, kept for compatibility
 export const PlatformNode = createContainerNodeHandler({
@@ -8,9 +8,17 @@ export const PlatformNode = createContainerNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { connectionId, testConnection, deleteConnection } = context
+    const { node, connectionId, platformType, editConnection, testConnection, deleteConnection } = context
 
-    if (connectionId) {
+    if (connectionId && platformType) {
+      const connectionData = node.data as ConnectionData | undefined
+      if (connectionData) {
+        items.push({
+          label: 'Edit Connection',
+          icon: <Settings size={14} />,
+          action: () => editConnection(connectionId, platformType, connectionData),
+        })
+      }
       items.push({
         label: 'Test Connection',
         icon: <TestTube size={14} />,
@@ -36,9 +44,17 @@ export const ConnectionNode = createContainerNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { connectionId, testConnection, deleteConnection } = context
+    const { node, connectionId, platformType, editConnection, testConnection, deleteConnection } = context
 
-    if (connectionId) {
+    if (connectionId && platformType) {
+      const connectionData = node.data as ConnectionData | undefined
+      if (connectionData) {
+        items.push({
+          label: 'Edit Connection',
+          icon: <Settings size={14} />,
+          action: () => editConnection(connectionId, platformType, connectionData),
+        })
+      }
       items.push({
         label: 'Test Connection',
         icon: <TestTube size={14} />,

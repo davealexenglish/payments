@@ -85,7 +85,8 @@ export interface Invoice {
 export interface CreateConnectionRequest {
   platform_type: 'maxio' | 'zuora' | 'stripe'
   name: string
-  subdomain?: string
+  subdomain?: string     // Used by Maxio
+  base_url?: string      // Used by Zuora
   api_key?: string       // Used by Maxio, Stripe
   client_id?: string     // Used by Zuora
   client_secret?: string // Used by Zuora

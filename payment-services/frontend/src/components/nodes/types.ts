@@ -22,6 +22,21 @@ export interface MenuItem {
   disabled?: boolean
 }
 
+// Connection data for editing
+export interface ConnectionData {
+  id: number
+  name: string
+  is_sandbox: boolean
+  // Maxio specific
+  subdomain?: string
+  api_key?: string
+  // Stripe specific (uses api_key)
+  // Zuora specific
+  base_url?: string
+  client_id?: string
+  client_secret?: string
+}
+
 // Context passed to node handlers for performing actions
 export interface NodeContext {
   node: TreeNodeData
@@ -42,6 +57,8 @@ export interface NodeContext {
   onCreateCoupon?: (connectionId: number) => void
   onDeleteCoupon?: (connectionId: number, couponId: string) => void
   // Connection operations
+  addConnection: (platformType: 'maxio' | 'stripe' | 'zuora') => void
+  editConnection: (connectionId: number, platformType: string, connectionData: ConnectionData) => void
   testConnection: (connectionId: number) => void
   deleteConnection: (connectionId: number) => void
 }

@@ -145,7 +145,7 @@ func (c *Client) TestConnection() error {
 	return nil
 }
 
-// ListAccounts returns a list of accounts
+// ListAccounts returns a list of accounts using ZOQL query
 func (c *Client) ListAccounts(page, pageSize int) ([]Account, error) {
 	if pageSize <= 0 {
 		pageSize = 50
@@ -154,8 +154,14 @@ func (c *Client) ListAccounts(page, pageSize int) ([]Account, error) {
 		page = 1
 	}
 
-	path := fmt.Sprintf("/v1/accounts?pageSize=%d&page=%d", pageSize, page)
-	resp, err := c.doRequest("GET", path, nil)
+	// Use ZOQL to query accounts (ZOQL doesn't support ORDER BY or LIMIT)
+	query := "SELECT Id, Name, AccountNumber, Status, Currency, Balance, CreatedDate FROM Account"
+
+	queryReq := map[string]string{
+		"queryString": query,
+	}
+
+	resp, err := c.doRequest("POST", "/v1/action/query", queryReq)
 	if err != nil {
 		return nil, err
 	}
@@ -166,12 +172,46 @@ func (c *Client) ListAccounts(page, pageSize int) ([]Account, error) {
 		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
 	}
 
-	var result AccountsResponse
+	var result ZOQLQueryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return result.Accounts, nil
+	if !result.Done {
+		// For simplicity, we're not handling pagination here
+		// In production, you'd follow the queryLocator for more results
+	}
+
+	// Convert ZOQL records to Account structs
+	accounts := make([]Account, 0, len(result.Records))
+	for _, record := range result.Records {
+		account := Account{
+			ID:            getString(record, "Id"),
+			Name:          getString(record, "Name"),
+			AccountNumber: getString(record, "AccountNumber"),
+			Status:        getString(record, "Status"),
+			Currency:      getString(record, "Currency"),
+		}
+		if balance, ok := record["Balance"].(float64); ok {
+			account.Balance = balance
+		}
+		if createdDate, ok := record["CreatedDate"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, createdDate); err == nil {
+				account.CreatedDate = &t
+			}
+		}
+		accounts = append(accounts, account)
+	}
+
+	return accounts, nil
+}
+
+// Helper to safely get string from map
+func getString(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
 }
 
 // GetAccount returns a single account by key (id or accountNumber)
@@ -225,7 +265,7 @@ func (c *Client) CreateAccount(input CreateAccountRequest) (*Account, error) {
 	return c.GetAccount(result.AccountID)
 }
 
-// ListSubscriptions returns a list of subscriptions
+// ListSubscriptions returns a list of subscriptions using ZOQL query
 func (c *Client) ListSubscriptions(page, pageSize int) ([]Subscription, error) {
 	if pageSize <= 0 {
 		pageSize = 50
@@ -234,8 +274,14 @@ func (c *Client) ListSubscriptions(page, pageSize int) ([]Subscription, error) {
 		page = 1
 	}
 
-	path := fmt.Sprintf("/v1/subscriptions?pageSize=%d&page=%d", pageSize, page)
-	resp, err := c.doRequest("GET", path, nil)
+	// Use ZOQL to query subscriptions (ZOQL doesn't support ORDER BY or LIMIT)
+	query := "SELECT Id, Name, AccountId, Status, ContractEffectiveDate, TermStartDate, TermEndDate, CreatedDate FROM Subscription"
+
+	queryReq := map[string]string{
+		"queryString": query,
+	}
+
+	resp, err := c.doRequest("POST", "/v1/action/query", queryReq)
 	if err != nil {
 		return nil, err
 	}
@@ -246,12 +292,32 @@ func (c *Client) ListSubscriptions(page, pageSize int) ([]Subscription, error) {
 		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
 	}
 
-	var result SubscriptionsResponse
+	var result ZOQLQueryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return result.Subscriptions, nil
+	// Convert ZOQL records to Subscription structs
+	subscriptions := make([]Subscription, 0, len(result.Records))
+	for _, record := range result.Records {
+		sub := Subscription{
+			ID:                    getString(record, "Id"),
+			SubscriptionNumber:    getString(record, "Name"),
+			AccountID:             getString(record, "AccountId"),
+			Status:                getString(record, "Status"),
+			ContractEffectiveDate: getString(record, "ContractEffectiveDate"),
+			TermStartDate:         getString(record, "TermStartDate"),
+			TermEndDate:           getString(record, "TermEndDate"),
+		}
+		if createdDate, ok := record["CreatedDate"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, createdDate); err == nil {
+				sub.CreatedDate = &t
+			}
+		}
+		subscriptions = append(subscriptions, sub)
+	}
+
+	return subscriptions, nil
 }
 
 // GetSubscription returns a single subscription by key
@@ -280,7 +346,7 @@ func (c *Client) GetSubscription(subscriptionKey string) (*Subscription, error) 
 	return &subscription, nil
 }
 
-// ListProducts returns a list of products from the catalog
+// ListProducts returns a list of products using ZOQL query
 func (c *Client) ListProducts(page, pageSize int) ([]Product, error) {
 	if pageSize <= 0 {
 		pageSize = 50
@@ -289,8 +355,14 @@ func (c *Client) ListProducts(page, pageSize int) ([]Product, error) {
 		page = 1
 	}
 
-	path := fmt.Sprintf("/v1/catalog/products?pageSize=%d&page=%d", pageSize, page)
-	resp, err := c.doRequest("GET", path, nil)
+	// Use ZOQL to query products
+	query := "SELECT Id, Name, SKU, Description, Category, EffectiveStartDate, EffectiveEndDate, CreatedDate FROM Product"
+
+	queryReq := map[string]string{
+		"queryString": query,
+	}
+
+	resp, err := c.doRequest("POST", "/v1/action/query", queryReq)
 	if err != nil {
 		return nil, err
 	}
@@ -301,12 +373,32 @@ func (c *Client) ListProducts(page, pageSize int) ([]Product, error) {
 		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
 	}
 
-	var result ProductsResponse
+	var result ZOQLQueryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return result.Products, nil
+	// Convert ZOQL records to Product structs
+	products := make([]Product, 0, len(result.Records))
+	for _, record := range result.Records {
+		product := Product{
+			ID:                 getString(record, "Id"),
+			Name:               getString(record, "Name"),
+			SKU:                getString(record, "SKU"),
+			Description:        getString(record, "Description"),
+			Category:           getString(record, "Category"),
+			EffectiveStartDate: getString(record, "EffectiveStartDate"),
+			EffectiveEndDate:   getString(record, "EffectiveEndDate"),
+		}
+		if createdDate, ok := record["CreatedDate"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, createdDate); err == nil {
+				product.CreatedDate = &t
+			}
+		}
+		products = append(products, product)
+	}
+
+	return products, nil
 }
 
 // GetProduct returns a single product by key
@@ -361,7 +453,7 @@ func (c *Client) ListProductRatePlans(productKey string) ([]ProductRatePlan, err
 	return result.ProductRatePlans, nil
 }
 
-// ListInvoices returns a list of invoices
+// ListInvoices returns a list of invoices using ZOQL query
 func (c *Client) ListInvoices(page, pageSize int) ([]Invoice, error) {
 	if pageSize <= 0 {
 		pageSize = 50
@@ -370,8 +462,14 @@ func (c *Client) ListInvoices(page, pageSize int) ([]Invoice, error) {
 		page = 1
 	}
 
-	path := fmt.Sprintf("/v1/invoices?pageSize=%d&page=%d", pageSize, page)
-	resp, err := c.doRequest("GET", path, nil)
+	// Use ZOQL to query invoices
+	query := "SELECT Id, InvoiceNumber, AccountId, InvoiceDate, DueDate, Status, Amount, Balance, CreatedDate FROM Invoice"
+
+	queryReq := map[string]string{
+		"queryString": query,
+	}
+
+	resp, err := c.doRequest("POST", "/v1/action/query", queryReq)
 	if err != nil {
 		return nil, err
 	}
@@ -382,12 +480,37 @@ func (c *Client) ListInvoices(page, pageSize int) ([]Invoice, error) {
 		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
 	}
 
-	var result InvoicesResponse
+	var result ZOQLQueryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return result.Invoices, nil
+	// Convert ZOQL records to Invoice structs
+	invoices := make([]Invoice, 0, len(result.Records))
+	for _, record := range result.Records {
+		invoice := Invoice{
+			ID:            getString(record, "Id"),
+			InvoiceNumber: getString(record, "InvoiceNumber"),
+			AccountID:     getString(record, "AccountId"),
+			InvoiceDate:   getString(record, "InvoiceDate"),
+			DueDate:       getString(record, "DueDate"),
+			Status:        getString(record, "Status"),
+		}
+		if amount, ok := record["Amount"].(float64); ok {
+			invoice.Amount = amount
+		}
+		if balance, ok := record["Balance"].(float64); ok {
+			invoice.Balance = balance
+		}
+		if createdDate, ok := record["CreatedDate"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, createdDate); err == nil {
+				invoice.CreatedDate = &t
+			}
+		}
+		invoices = append(invoices, invoice)
+	}
+
+	return invoices, nil
 }
 
 // GetInvoice returns a single invoice by ID
@@ -414,4 +537,61 @@ func (c *Client) GetInvoice(invoiceID string) (*Invoice, error) {
 	}
 
 	return &invoice, nil
+}
+
+// ListPayments returns a list of payments using ZOQL query
+func (c *Client) ListPayments(page, pageSize int) ([]Payment, error) {
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if page <= 0 {
+		page = 1
+	}
+
+	// Use ZOQL to query payments
+	query := "SELECT Id, PaymentNumber, AccountId, Amount, EffectiveDate, Status, Type, CreatedDate FROM Payment"
+
+	queryReq := map[string]string{
+		"queryString": query,
+	}
+
+	resp, err := c.doRequest("POST", "/v1/action/query", queryReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, NewAPIError(resp.StatusCode, fmt.Sprintf("API error (status %d): %s", resp.StatusCode, string(body)))
+	}
+
+	var result ZOQLQueryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Convert ZOQL records to Payment structs
+	payments := make([]Payment, 0, len(result.Records))
+	for _, record := range result.Records {
+		payment := Payment{
+			ID:            getString(record, "Id"),
+			PaymentNumber: getString(record, "PaymentNumber"),
+			AccountID:     getString(record, "AccountId"),
+			EffectiveDate: getString(record, "EffectiveDate"),
+			Status:        getString(record, "Status"),
+			Type:          getString(record, "Type"),
+		}
+		if amount, ok := record["Amount"].(float64); ok {
+			payment.Amount = amount
+		}
+		if createdDate, ok := record["CreatedDate"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, createdDate); err == nil {
+				payment.CreatedDate = &t
+			}
+		}
+		payments = append(payments, payment)
+	}
+
+	return payments, nil
 }

@@ -1,17 +1,24 @@
-import { Database } from 'lucide-react'
+import { Database, Plus } from 'lucide-react'
 import { createContainerNodeHandler } from './BaseNode'
 import type { MenuItem, NodeContext } from './types'
 
 // Vendor root nodes (Maxio, Stripe, Zuora)
 // These are static parent nodes that contain connection children
 
-const createVendorNodeHandler = (vendorName: string) => createContainerNodeHandler({
+const createVendorNodeHandler = (
+  vendorName: string,
+  platformType: 'maxio' | 'stripe' | 'zuora'
+) => createContainerNodeHandler({
   icon: (size) => <Database size={size} />,
 
-  getTypeSpecificMenuItems: (_context: NodeContext): MenuItem[] => {
-    // Vendor nodes don't have context menu items
-    // Add Connection is handled via toolbar
-    return []
+  getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
+    return [
+      {
+        label: `Add ${vendorName} Connection`,
+        icon: <Plus size={14} />,
+        action: () => context.addConnection(platformType),
+      },
+    ]
   },
 
   isLazyLoaded: () => false, // Vendor has static children (connections)
@@ -19,6 +26,6 @@ const createVendorNodeHandler = (vendorName: string) => createContainerNodeHandl
   getDisplayName: () => vendorName,
 })
 
-export const VendorMaxioNode = createVendorNodeHandler('Maxio (Chargify)')
-export const VendorStripeNode = createVendorNodeHandler('Stripe')
-export const VendorZuoraNode = createVendorNodeHandler('Zuora')
+export const VendorMaxioNode = createVendorNodeHandler('Maxio', 'maxio')
+export const VendorStripeNode = createVendorNodeHandler('Stripe', 'stripe')
+export const VendorZuoraNode = createVendorNodeHandler('Zuora', 'zuora')
