@@ -4,11 +4,22 @@ import { TreeView } from './components/TreeView'
 import { PropertiesPanel } from './components/PropertiesPanel'
 import { Toolbar } from './components/Toolbar'
 import { PlatformConnectionDialog } from './components/dialogs/PlatformConnectionDialog'
-import { CreateCustomerDialog } from './components/dialogs/CreateCustomerDialog'
-import { CreateSubscriptionDialog } from './components/dialogs/CreateSubscriptionDialog'
-import { CreateProductFamilyDialog } from './components/dialogs/CreateProductFamilyDialog'
-import { CreateProductDialog } from './components/dialogs/CreateProductDialog'
 import { ToastProvider } from './components/Toast'
+// Stripe dialogs
+import {
+  CreateStripeCustomerDialog,
+  CreateStripeProductDialog,
+  CreateStripePriceDialog,
+  CreateStripeSubscriptionDialog,
+  CreateStripeCouponDialog,
+} from './components/dialogs/stripe'
+// Maxio dialogs
+import {
+  CreateMaxioCustomerDialog,
+  CreateMaxioProductFamilyDialog,
+  CreateMaxioProductDialog,
+  CreateMaxioSubscriptionDialog,
+} from './components/dialogs/maxio'
 import type { ProductFamily, Customer, Product, PlatformConnection } from './api'
 import './App.css'
 
@@ -31,32 +42,72 @@ function getPlatformTypeFromVendorNode(nodeType: string): PlatformConnection['pl
   return null
 }
 
+// Dialog state types
+interface CustomerDialogState {
+  show: boolean
+  connectionId: number | null
+  platformType: string | null
+  customer?: Customer // For edit mode
+}
+
+interface SubscriptionDialogState {
+  show: boolean
+  connectionId: number | null
+  platformType: string | null
+  customerId?: string
+}
+
+interface ProductFamilyDialogState {
+  show: boolean
+  connectionId: number | null
+  platformType: string | null
+}
+
+interface ProductDialogState {
+  show: boolean
+  connectionId: number | null
+  platformType: string | null
+  productFamily: ProductFamily | null
+  product?: Product // For edit mode
+}
+
+interface CouponDialogState {
+  show: boolean
+  connectionId: number | null
+}
+
 function App() {
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
   const [treePanelWidth, setTreePanelWidth] = useState(300)
   const [showConnectionDialog, setShowConnectionDialog] = useState(false)
   const [connectionDialogPlatformType, setConnectionDialogPlatformType] = useState<PlatformConnection['platform_type'] | null>(null)
-  const [showCreateCustomerDialog, setShowCreateCustomerDialog] = useState(false)
-  const [createCustomerConnectionId, setCreateCustomerConnectionId] = useState<number | null>(null)
-  const [createCustomerPlatformType, setCreateCustomerPlatformType] = useState<string | null>(null)
-  const [showCreateSubscriptionDialog, setShowCreateSubscriptionDialog] = useState(false)
-  const [createSubscriptionConnectionId, setCreateSubscriptionConnectionId] = useState<number | null>(null)
-  const [createSubscriptionCustomerId, setCreateSubscriptionCustomerId] = useState<string | undefined>(undefined)
-  const [createSubscriptionPlatformType, setCreateSubscriptionPlatformType] = useState<string | null>(null)
-  const [showCreateProductFamilyDialog, setShowCreateProductFamilyDialog] = useState(false)
-  const [createProductFamilyConnectionId, setCreateProductFamilyConnectionId] = useState<number | null>(null)
-  const [createProductFamilyPlatformType, setCreateProductFamilyPlatformType] = useState<string | null>(null)
-  const [showCreateProductDialog, setShowCreateProductDialog] = useState(false)
-  const [createProductConnectionId, setCreateProductConnectionId] = useState<number | null>(null)
-  const [createProductFamily, setCreateProductFamily] = useState<ProductFamily | null>(null)
-  const [createProductPlatformType, setCreateProductPlatformType] = useState<string | null>(null)
-  // Edit states
-  const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
-  const [editCustomerConnectionId, setEditCustomerConnectionId] = useState<number | null>(null)
-  const [editCustomerPlatformType, setEditCustomerPlatformType] = useState<string | null>(null)
-  const [editProduct, setEditProduct] = useState<Product | null>(null)
-  const [editProductConnectionId, setEditProductConnectionId] = useState<number | null>(null)
-  const [editProductPlatformType, setEditProductPlatformType] = useState<string | null>(null)
+
+  // Dialog states
+  const [customerDialog, setCustomerDialog] = useState<CustomerDialogState>({
+    show: false,
+    connectionId: null,
+    platformType: null,
+  })
+  const [subscriptionDialog, setSubscriptionDialog] = useState<SubscriptionDialogState>({
+    show: false,
+    connectionId: null,
+    platformType: null,
+  })
+  const [productFamilyDialog, setProductFamilyDialog] = useState<ProductFamilyDialogState>({
+    show: false,
+    connectionId: null,
+    platformType: null,
+  })
+  const [productDialog, setProductDialog] = useState<ProductDialogState>({
+    show: false,
+    connectionId: null,
+    platformType: null,
+    productFamily: null,
+  })
+  const [couponDialog, setCouponDialog] = useState<CouponDialogState>({
+    show: false,
+    connectionId: null,
+  })
 
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef<string | null>(null)
@@ -84,49 +135,261 @@ function App() {
   }, [])
 
   const handleCreateCustomer = useCallback((connectionId: number, platformType?: string) => {
-    setCreateCustomerConnectionId(connectionId)
-    setCreateCustomerPlatformType(platformType || null)
-    setShowCreateCustomerDialog(true)
+    setCustomerDialog({
+      show: true,
+      connectionId,
+      platformType: platformType || null,
+    })
   }, [])
 
   const handleCreateSubscription = useCallback((connectionId: number, customerId?: string, platformType?: string) => {
-    setCreateSubscriptionConnectionId(connectionId)
-    setCreateSubscriptionCustomerId(customerId)
-    setCreateSubscriptionPlatformType(platformType || null)
-    setShowCreateSubscriptionDialog(true)
+    setSubscriptionDialog({
+      show: true,
+      connectionId,
+      platformType: platformType || null,
+      customerId,
+    })
   }, [])
 
   const handleCreateProductFamily = useCallback((connectionId: number, platformType?: string) => {
-    setCreateProductFamilyConnectionId(connectionId)
-    setCreateProductFamilyPlatformType(platformType || null)
-    setShowCreateProductFamilyDialog(true)
+    setProductFamilyDialog({
+      show: true,
+      connectionId,
+      platformType: platformType || null,
+    })
   }, [])
 
   const handleCreateProduct = useCallback((connectionId: number, productFamily: ProductFamily, platformType?: string) => {
-    setCreateProductConnectionId(connectionId)
-    setCreateProductFamily(productFamily)
-    setCreateProductPlatformType(platformType || null)
-    setShowCreateProductDialog(true)
+    setProductDialog({
+      show: true,
+      connectionId,
+      platformType: platformType || null,
+      productFamily,
+    })
   }, [])
 
   const handleEditCustomer = useCallback((connectionId: number, customer: Customer, platformType?: string) => {
-    setEditCustomerConnectionId(connectionId)
-    setEditCustomer(customer)
-    setEditCustomerPlatformType(platformType || null)
-    setShowCreateCustomerDialog(true)
+    setCustomerDialog({
+      show: true,
+      connectionId,
+      platformType: platformType || null,
+      customer,
+    })
   }, [])
 
   const handleEditProduct = useCallback((connectionId: number, product: Product, platformType?: string) => {
-    setEditProductConnectionId(connectionId)
-    setEditProduct(product)
-    setEditProductPlatformType(platformType || null)
-    setShowCreateProductDialog(true)
+    setProductDialog({
+      show: true,
+      connectionId,
+      platformType: platformType || null,
+      productFamily: product.product_family || null,
+      product,
+    })
+  }, [])
+
+  const handleCreateCoupon = useCallback((connectionId: number) => {
+    setCouponDialog({
+      show: true,
+      connectionId,
+    })
+  }, [])
+
+  const handleDeleteCoupon = useCallback(async (connectionId: number, couponId: string) => {
+    if (!confirm(`Are you sure you want to delete coupon "${couponId}"?`)) return
+    try {
+      const { deleteStripeCoupon } = await import('./api')
+      await deleteStripeCoupon(connectionId, couponId)
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', String(connectionId)] })
+    } catch (err) {
+      console.error('Delete coupon failed:', err)
+    }
   }, [])
 
   const handleRefreshTree = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['tree'] })
     queryClient.invalidateQueries({ queryKey: ['connections'] })
   }, [])
+
+  const closeCustomerDialog = useCallback(() => {
+    setCustomerDialog({ show: false, connectionId: null, platformType: null })
+  }, [])
+
+  const closeSubscriptionDialog = useCallback(() => {
+    setSubscriptionDialog({ show: false, connectionId: null, platformType: null })
+  }, [])
+
+  const closeProductFamilyDialog = useCallback(() => {
+    setProductFamilyDialog({ show: false, connectionId: null, platformType: null })
+  }, [])
+
+  const closeProductDialog = useCallback(() => {
+    setProductDialog({ show: false, connectionId: null, platformType: null, productFamily: null })
+  }, [])
+
+  const closeCouponDialog = useCallback(() => {
+    setCouponDialog({ show: false, connectionId: null })
+  }, [])
+
+  // Render vendor-specific customer dialog
+  const renderCustomerDialog = () => {
+    if (!customerDialog.show || !customerDialog.connectionId) return null
+
+    const { connectionId, platformType, customer } = customerDialog
+    const onSuccess = () => {
+      closeCustomerDialog()
+      queryClient.invalidateQueries({ queryKey: [platformType, 'customers'] })
+    }
+
+    switch (platformType) {
+      case 'stripe':
+        // Note: Stripe doesn't have an edit mode in our current implementation
+        return (
+          <CreateStripeCustomerDialog
+            connectionId={connectionId}
+            onClose={closeCustomerDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      case 'maxio':
+        return (
+          <CreateMaxioCustomerDialog
+            connectionId={connectionId}
+            customer={customer}
+            onClose={closeCustomerDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
+  // Render vendor-specific subscription dialog
+  const renderSubscriptionDialog = () => {
+    if (!subscriptionDialog.show || !subscriptionDialog.connectionId) return null
+
+    const { connectionId, platformType, customerId } = subscriptionDialog
+    const onSuccess = () => {
+      closeSubscriptionDialog()
+      queryClient.invalidateQueries({ queryKey: [platformType, 'subscriptions'] })
+    }
+
+    switch (platformType) {
+      case 'stripe':
+        return (
+          <CreateStripeSubscriptionDialog
+            connectionId={connectionId}
+            customerId={customerId}
+            onClose={closeSubscriptionDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      case 'maxio':
+        return (
+          <CreateMaxioSubscriptionDialog
+            connectionId={connectionId}
+            customerId={customerId}
+            onClose={closeSubscriptionDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
+  // Render vendor-specific product family dialog
+  const renderProductFamilyDialog = () => {
+    if (!productFamilyDialog.show || !productFamilyDialog.connectionId) return null
+
+    const { connectionId, platformType } = productFamilyDialog
+    const onSuccess = () => {
+      closeProductFamilyDialog()
+      queryClient.invalidateQueries({ queryKey: [platformType, 'product-families'] })
+    }
+
+    switch (platformType) {
+      case 'stripe':
+        // In Stripe, "Product Family" = Product
+        return (
+          <CreateStripeProductDialog
+            connectionId={connectionId}
+            onClose={closeProductFamilyDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      case 'maxio':
+        return (
+          <CreateMaxioProductFamilyDialog
+            connectionId={connectionId}
+            onClose={closeProductFamilyDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
+  // Render vendor-specific product dialog
+  const renderProductDialog = () => {
+    if (!productDialog.show || !productDialog.connectionId) return null
+
+    const { connectionId, platformType, productFamily, product } = productDialog
+    const onSuccess = () => {
+      closeProductDialog()
+      if (productFamily?.id) {
+        queryClient.invalidateQueries({ queryKey: [platformType, `products-${productFamily.id}`] })
+      }
+      queryClient.invalidateQueries({ queryKey: [platformType, 'products'] })
+    }
+
+    switch (platformType) {
+      case 'stripe':
+        // In Stripe, "Product" under a Product = Price
+        if (!productFamily) return null
+        return (
+          <CreateStripePriceDialog
+            connectionId={connectionId}
+            product={productFamily}
+            onClose={closeProductDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      case 'maxio':
+        if (!productFamily) return null
+        return (
+          <CreateMaxioProductDialog
+            connectionId={connectionId}
+            productFamily={productFamily}
+            product={product}
+            onClose={closeProductDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
+  // Render coupon dialog (Stripe only)
+  const renderCouponDialog = () => {
+    if (!couponDialog.show || !couponDialog.connectionId) return null
+
+    const { connectionId } = couponDialog
+    const onSuccess = () => {
+      closeCouponDialog()
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', String(connectionId)] })
+    }
+
+    return (
+      <CreateStripeCouponDialog
+        connectionId={connectionId}
+        onClose={closeCouponDialog}
+        onSuccess={onSuccess}
+      />
+    )
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -162,6 +425,8 @@ function App() {
                 onCreateProduct={handleCreateProduct}
                 onEditCustomer={handleEditCustomer}
                 onEditProduct={handleEditProduct}
+                onCreateCoupon={handleCreateCoupon}
+                onDeleteCoupon={handleDeleteCoupon}
               />
             </div>
           </div>
@@ -199,109 +464,12 @@ function App() {
           />
         )}
 
-        {/* Create/Edit Customer Dialog */}
-        {showCreateCustomerDialog && (createCustomerConnectionId || editCustomerConnectionId) && (
-          <CreateCustomerDialog
-            connectionId={(editCustomerConnectionId || createCustomerConnectionId)!}
-            platformType={(editCustomerPlatformType || createCustomerPlatformType) || 'maxio'}
-            customer={editCustomer || undefined}
-            onClose={() => {
-              setShowCreateCustomerDialog(false)
-              setCreateCustomerConnectionId(null)
-              setCreateCustomerPlatformType(null)
-              setEditCustomer(null)
-              setEditCustomerConnectionId(null)
-              setEditCustomerPlatformType(null)
-            }}
-            onSuccess={() => {
-              setShowCreateCustomerDialog(false)
-              setCreateCustomerConnectionId(null)
-              setCreateCustomerPlatformType(null)
-              setEditCustomer(null)
-              setEditCustomerConnectionId(null)
-              setEditCustomerPlatformType(null)
-              const pt = editCustomerPlatformType || createCustomerPlatformType || 'maxio'
-              queryClient.invalidateQueries({ queryKey: [pt, 'customers'] })
-            }}
-          />
-        )}
-
-        {/* Create Subscription Dialog */}
-        {showCreateSubscriptionDialog && createSubscriptionConnectionId && (
-          <CreateSubscriptionDialog
-            connectionId={createSubscriptionConnectionId}
-            platformType={createSubscriptionPlatformType || 'maxio'}
-            customerId={createSubscriptionCustomerId}
-            onClose={() => {
-              setShowCreateSubscriptionDialog(false)
-              setCreateSubscriptionConnectionId(null)
-              setCreateSubscriptionCustomerId(undefined)
-              setCreateSubscriptionPlatformType(null)
-            }}
-            onSuccess={() => {
-              setShowCreateSubscriptionDialog(false)
-              setCreateSubscriptionConnectionId(null)
-              setCreateSubscriptionCustomerId(undefined)
-              const pt = createSubscriptionPlatformType || 'maxio'
-              setCreateSubscriptionPlatformType(null)
-              queryClient.invalidateQueries({ queryKey: [pt, 'subscriptions'] })
-            }}
-          />
-        )}
-
-        {/* Create Product Family Dialog */}
-        {showCreateProductFamilyDialog && createProductFamilyConnectionId && (
-          <CreateProductFamilyDialog
-            connectionId={createProductFamilyConnectionId}
-            platformType={createProductFamilyPlatformType || 'maxio'}
-            onClose={() => {
-              setShowCreateProductFamilyDialog(false)
-              setCreateProductFamilyConnectionId(null)
-              setCreateProductFamilyPlatformType(null)
-            }}
-            onSuccess={() => {
-              setShowCreateProductFamilyDialog(false)
-              setCreateProductFamilyConnectionId(null)
-              const pt = createProductFamilyPlatformType || 'maxio'
-              setCreateProductFamilyPlatformType(null)
-              queryClient.invalidateQueries({ queryKey: [pt, 'product-families'] })
-            }}
-          />
-        )}
-
-        {/* Create/Edit Product Dialog */}
-        {showCreateProductDialog && ((createProductConnectionId && createProductFamily) || (editProductConnectionId && editProduct)) && (
-          <CreateProductDialog
-            connectionId={(editProductConnectionId || createProductConnectionId)!}
-            platformType={(editProductPlatformType || createProductPlatformType) || 'maxio'}
-            productFamily={createProductFamily || undefined}
-            product={editProduct || undefined}
-            onClose={() => {
-              setShowCreateProductDialog(false)
-              setCreateProductConnectionId(null)
-              setCreateProductFamily(null)
-              setCreateProductPlatformType(null)
-              setEditProduct(null)
-              setEditProductConnectionId(null)
-              setEditProductPlatformType(null)
-            }}
-            onSuccess={() => {
-              setShowCreateProductDialog(false)
-              setCreateProductConnectionId(null)
-              const familyId = createProductFamily?.id || editProduct?.product_family?.id
-              const pt = editProductPlatformType || createProductPlatformType || 'maxio'
-              setCreateProductFamily(null)
-              setCreateProductPlatformType(null)
-              setEditProduct(null)
-              setEditProductConnectionId(null)
-              setEditProductPlatformType(null)
-              if (familyId) {
-                queryClient.invalidateQueries({ queryKey: [pt, `products-${familyId}`] })
-              }
-              queryClient.invalidateQueries({ queryKey: [pt, 'products'] })
-            }}
-          />
-        )}
+        {/* Vendor-specific dialogs */}
+        {renderCustomerDialog()}
+        {renderSubscriptionDialog()}
+        {renderProductFamilyDialog()}
+        {renderProductDialog()}
+        {renderCouponDialog()}
       </div>
       </ToastProvider>
     </QueryClientProvider>

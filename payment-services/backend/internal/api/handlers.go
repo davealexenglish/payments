@@ -16,7 +16,7 @@ import (
 
 func (s *Server) handleListConnections(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Pool().Query(context.Background(), `
-		SELECT id, platform_type, name, COALESCE(subdomain, ''), is_sandbox, status, COALESCE(error_message, ''), last_sync_at, created_at, updated_at
+		SELECT id, platform_type, name, COALESCE(subdomain, ''), COALESCE(base_url, ''), is_sandbox, status, COALESCE(error_message, ''), last_sync_at, created_at, updated_at
 		FROM platform_connections
 		ORDER BY name
 	`)
@@ -30,7 +30,7 @@ func (s *Server) handleListConnections(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var conn models.PlatformConnection
 		err := rows.Scan(
-			&conn.ID, &conn.PlatformType, &conn.Name, &conn.Subdomain,
+			&conn.ID, &conn.PlatformType, &conn.Name, &conn.Subdomain, &conn.BaseURL,
 			&conn.IsSandbox, &conn.Status, &conn.ErrorMessage, &conn.LastSyncAt,
 			&conn.CreatedAt, &conn.UpdatedAt,
 		)
@@ -86,10 +86,10 @@ func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) 
 	// Insert connection
 	var connID int64
 	err = tx.QueryRow(ctx, `
-		INSERT INTO platform_connections (platform_type, name, subdomain, is_sandbox, status)
-		VALUES ($1, $2, $3, $4, 'pending')
+		INSERT INTO platform_connections (platform_type, name, subdomain, base_url, is_sandbox, status)
+		VALUES ($1, $2, $3, $4, $5, 'pending')
 		RETURNING id
-	`, req.PlatformType, req.Name, req.Subdomain, req.IsSandbox).Scan(&connID)
+	`, req.PlatformType, req.Name, req.Subdomain, req.BaseURL, req.IsSandbox).Scan(&connID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -129,10 +129,10 @@ func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) 
 	// Return the created connection
 	var conn models.PlatformConnection
 	err = s.db.Pool().QueryRow(ctx, `
-		SELECT id, platform_type, name, COALESCE(subdomain, ''), is_sandbox, status, COALESCE(error_message, ''), last_sync_at, created_at, updated_at
+		SELECT id, platform_type, name, COALESCE(subdomain, ''), COALESCE(base_url, ''), is_sandbox, status, COALESCE(error_message, ''), last_sync_at, created_at, updated_at
 		FROM platform_connections WHERE id = $1
 	`, connID).Scan(
-		&conn.ID, &conn.PlatformType, &conn.Name, &conn.Subdomain,
+		&conn.ID, &conn.PlatformType, &conn.Name, &conn.Subdomain, &conn.BaseURL,
 		&conn.IsSandbox, &conn.Status, &conn.ErrorMessage, &conn.LastSyncAt,
 		&conn.CreatedAt, &conn.UpdatedAt,
 	)
@@ -154,10 +154,10 @@ func (s *Server) handleGetConnection(w http.ResponseWriter, r *http.Request) {
 
 	var conn models.PlatformConnection
 	err = s.db.Pool().QueryRow(context.Background(), `
-		SELECT id, platform_type, name, COALESCE(subdomain, ''), is_sandbox, status, COALESCE(error_message, ''), last_sync_at, created_at, updated_at
+		SELECT id, platform_type, name, COALESCE(subdomain, ''), COALESCE(base_url, ''), is_sandbox, status, COALESCE(error_message, ''), last_sync_at, created_at, updated_at
 		FROM platform_connections WHERE id = $1
 	`, id).Scan(
-		&conn.ID, &conn.PlatformType, &conn.Name, &conn.Subdomain,
+		&conn.ID, &conn.PlatformType, &conn.Name, &conn.Subdomain, &conn.BaseURL,
 		&conn.IsSandbox, &conn.Status, &conn.ErrorMessage, &conn.LastSyncAt,
 		&conn.CreatedAt, &conn.UpdatedAt,
 	)
@@ -180,6 +180,7 @@ func (s *Server) handleUpdateConnection(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		Name      string `json:"name"`
 		Subdomain string `json:"subdomain"`
+		BaseURL   string `json:"base_url"`
 		IsSandbox bool   `json:"is_sandbox"`
 		APIKey    string `json:"api_key,omitempty"`
 	}
@@ -193,9 +194,9 @@ func (s *Server) handleUpdateConnection(w http.ResponseWriter, r *http.Request) 
 	// Update connection
 	_, err = s.db.Pool().Exec(ctx, `
 		UPDATE platform_connections
-		SET name = $1, subdomain = $2, is_sandbox = $3, updated_at = NOW()
-		WHERE id = $4
-	`, req.Name, req.Subdomain, req.IsSandbox, id)
+		SET name = $1, subdomain = $2, base_url = $3, is_sandbox = $4, updated_at = NOW()
+		WHERE id = $5
+	`, req.Name, req.Subdomain, req.BaseURL, req.IsSandbox, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -356,6 +357,61 @@ func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create connection node with entity containers
+		children := []*models.TreeNode{
+			{
+				ID:           "customers-" + strconv.FormatInt(id, 10),
+				Type:         "customers",
+				Name:         "Customers",
+				ConnectionID: &id,
+				PlatformType: platformType,
+				IsExpandable: true,
+			},
+			{
+				ID:           "subscriptions-" + strconv.FormatInt(id, 10),
+				Type:         "subscriptions",
+				Name:         "Subscriptions",
+				ConnectionID: &id,
+				PlatformType: platformType,
+				IsExpandable: true,
+			},
+			{
+				ID:           "product-families-" + strconv.FormatInt(id, 10),
+				Type:         "product-families",
+				Name:         "Product Families",
+				ConnectionID: &id,
+				PlatformType: platformType,
+				IsExpandable: true,
+			},
+			{
+				ID:           "invoices-" + strconv.FormatInt(id, 10),
+				Type:         "invoices",
+				Name:         "Invoices",
+				ConnectionID: &id,
+				PlatformType: platformType,
+				IsExpandable: true,
+			},
+			{
+				ID:           "payments-" + strconv.FormatInt(id, 10),
+				Type:         "payments",
+				Name:         "Payments",
+				ConnectionID: &id,
+				PlatformType: platformType,
+				IsExpandable: true,
+			},
+		}
+
+		// Add Stripe-specific containers
+		if platformType == "stripe" {
+			children = append(children, &models.TreeNode{
+				ID:           "coupons-" + strconv.FormatInt(id, 10),
+				Type:         "coupons",
+				Name:         "Coupons",
+				ConnectionID: &id,
+				PlatformType: platformType,
+				IsExpandable: true,
+			})
+		}
+
 		connectionNode := &models.TreeNode{
 			ID:           "connection-" + strconv.FormatInt(id, 10),
 			Type:         "connection",
@@ -363,48 +419,7 @@ func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 			ConnectionID: &id,
 			PlatformType: platformType,
 			IsExpandable: true,
-			Children: []*models.TreeNode{
-				{
-					ID:           "customers-" + strconv.FormatInt(id, 10),
-					Type:         "customers",
-					Name:         "Customers",
-					ConnectionID: &id,
-					PlatformType: platformType,
-					IsExpandable: true,
-				},
-				{
-					ID:           "subscriptions-" + strconv.FormatInt(id, 10),
-					Type:         "subscriptions",
-					Name:         "Subscriptions",
-					ConnectionID: &id,
-					PlatformType: platformType,
-					IsExpandable: true,
-				},
-				{
-					ID:           "product-families-" + strconv.FormatInt(id, 10),
-					Type:         "product-families",
-					Name:         "Product Families",
-					ConnectionID: &id,
-					PlatformType: platformType,
-					IsExpandable: true,
-				},
-				{
-					ID:           "invoices-" + strconv.FormatInt(id, 10),
-					Type:         "invoices",
-					Name:         "Invoices",
-					ConnectionID: &id,
-					PlatformType: platformType,
-					IsExpandable: true,
-				},
-				{
-					ID:           "payments-" + strconv.FormatInt(id, 10),
-					Type:         "payments",
-					Name:         "Payments",
-					ConnectionID: &id,
-					PlatformType: platformType,
-					IsExpandable: true,
-				},
-			},
+			Children:     children,
 		}
 
 		// Add connection to the appropriate vendor node
@@ -503,19 +518,23 @@ func (s *Server) getZuoraClient(connectionID int64) (*zuora.Client, error) {
 
 	ctx := context.Background()
 
-	// Get connection details
+	// Get connection details including base_url
+	var baseURL string
 	var isSandbox bool
 	err := s.db.Pool().QueryRow(ctx, `
-		SELECT is_sandbox FROM platform_connections WHERE id = $1 AND platform_type = 'zuora'
-	`, connectionID).Scan(&isSandbox)
+		SELECT COALESCE(base_url, ''), is_sandbox FROM platform_connections WHERE id = $1 AND platform_type = 'zuora'
+	`, connectionID).Scan(&baseURL, &isSandbox)
 	if err != nil {
 		return nil, err
 	}
 
-	// Determine base URL
-	baseURL := "https://rest.zuora.com"
-	if isSandbox {
-		baseURL = "https://rest.apisandbox.zuora.com"
+	// Fall back to default URLs if base_url is not set
+	if baseURL == "" {
+		if isSandbox {
+			baseURL = "https://rest.sandbox.na.zuora.com"
+		} else {
+			baseURL = "https://rest.na.zuora.com"
+		}
 	}
 
 	// Get client_id

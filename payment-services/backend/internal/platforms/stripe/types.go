@@ -97,6 +97,24 @@ type SubscriptionList struct {
 	Data    []Subscription `json:"data"`
 }
 
+// SubscriptionInput is the input for creating a subscription
+// Maps to POST /v1/subscriptions - https://docs.stripe.com/api/subscriptions/create
+type SubscriptionInput struct {
+	CustomerID           string            `json:"customer_id"`
+	PriceID              string            `json:"price_id"`
+	Quantity             int               `json:"quantity,omitempty"`
+	CollectionMethod     string            `json:"collection_method,omitempty"`      // charge_automatically (default) or send_invoice
+	PaymentBehavior      string            `json:"payment_behavior,omitempty"`       // default_incomplete, error_if_incomplete, allow_incomplete, pending_if_incomplete
+	DaysUntilDue         int               `json:"days_until_due,omitempty"`         // Required if collection_method=send_invoice
+	TrialPeriodDays      int               `json:"trial_period_days,omitempty"`      // Number of trial days
+	Coupon               string            `json:"coupon,omitempty"`                 // Coupon code
+	Description          string            `json:"description,omitempty"`            // Internal description
+	CancelAtPeriodEnd    bool              `json:"cancel_at_period_end,omitempty"`   // Cancel at end of period
+	BillingCycleAnchor   int64             `json:"billing_cycle_anchor,omitempty"`   // Unix timestamp for billing cycle
+	DefaultPaymentMethod string            `json:"default_payment_method,omitempty"` // Payment method ID
+	Metadata             map[string]string `json:"metadata,omitempty"`
+}
+
 // Product represents a Stripe product
 type Product struct {
 	ID          string            `json:"id"`
@@ -230,6 +248,47 @@ type ChargeList struct {
 	URL     string   `json:"url"`
 	HasMore bool     `json:"has_more"`
 	Data    []Charge `json:"data"`
+}
+
+// Coupon represents a Stripe coupon
+// https://docs.stripe.com/api/coupons
+type Coupon struct {
+	ID               string            `json:"id"`
+	Object           string            `json:"object"`
+	AmountOff        *int64            `json:"amount_off,omitempty"`
+	Currency         string            `json:"currency,omitempty"`
+	Duration         string            `json:"duration"` // once, repeating, forever
+	DurationInMonths *int              `json:"duration_in_months,omitempty"`
+	MaxRedemptions   *int              `json:"max_redemptions,omitempty"`
+	Name             string            `json:"name,omitempty"`
+	PercentOff       *float64          `json:"percent_off,omitempty"`
+	RedeemBy         *int64            `json:"redeem_by,omitempty"`
+	TimesRedeemed    int               `json:"times_redeemed"`
+	Valid            bool              `json:"valid"`
+	Created          int64             `json:"created"`
+	Livemode         bool              `json:"livemode"`
+	Metadata         map[string]string `json:"metadata,omitempty"`
+}
+
+// CouponList is the response for listing coupons
+type CouponList struct {
+	Object  string   `json:"object"`
+	URL     string   `json:"url"`
+	HasMore bool     `json:"has_more"`
+	Data    []Coupon `json:"data"`
+}
+
+// CouponInput is the input for creating/updating a coupon
+type CouponInput struct {
+	ID               string  `json:"id,omitempty"`                 // Custom ID (optional on create)
+	AmountOff        int64   `json:"amount_off,omitempty"`         // Amount in cents
+	Currency         string  `json:"currency,omitempty"`           // Required if amount_off
+	Duration         string  `json:"duration"`                     // once, repeating, forever
+	DurationInMonths int     `json:"duration_in_months,omitempty"` // Required if duration=repeating
+	MaxRedemptions   int     `json:"max_redemptions,omitempty"`
+	Name             string  `json:"name,omitempty"`
+	PercentOff       float64 `json:"percent_off,omitempty"` // 0-100
+	RedeemBy         int64   `json:"redeem_by,omitempty"`   // Unix timestamp
 }
 
 // APIError represents a Stripe API error

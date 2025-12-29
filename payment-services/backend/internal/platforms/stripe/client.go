@@ -549,15 +549,66 @@ func (c *Client) ListPaymentIntents(limit int, startingAfter string) (*PaymentIn
 }
 
 // CreateSubscription creates a new subscription for a customer with a price
-func (c *Client) CreateSubscription(customerID, priceID string, paymentBehavior string) (*Subscription, error) {
+func (c *Client) CreateSubscription(input SubscriptionInput) (*Subscription, error) {
 	formData := url.Values{}
-	formData.Set("customer", customerID)
-	formData.Set("items[0][price]", priceID)
-	if paymentBehavior != "" {
-		formData.Set("payment_behavior", paymentBehavior)
+	formData.Set("customer", input.CustomerID)
+	formData.Set("items[0][price]", input.PriceID)
+
+	// Quantity (default 1)
+	if input.Quantity > 0 {
+		formData.Set("items[0][quantity]", fmt.Sprintf("%d", input.Quantity))
+	}
+
+	// Collection method
+	if input.CollectionMethod != "" {
+		formData.Set("collection_method", input.CollectionMethod)
+	}
+
+	// Payment behavior
+	if input.PaymentBehavior != "" {
+		formData.Set("payment_behavior", input.PaymentBehavior)
 	} else {
-		// Default to error_if_incomplete for simpler error handling
 		formData.Set("payment_behavior", "error_if_incomplete")
+	}
+
+	// Days until due (required for send_invoice)
+	if input.DaysUntilDue > 0 {
+		formData.Set("days_until_due", fmt.Sprintf("%d", input.DaysUntilDue))
+	}
+
+	// Trial period
+	if input.TrialPeriodDays > 0 {
+		formData.Set("trial_period_days", fmt.Sprintf("%d", input.TrialPeriodDays))
+	}
+
+	// Coupon (use discounts array instead of deprecated coupon param)
+	if input.Coupon != "" {
+		formData.Set("discounts[0][coupon]", input.Coupon)
+	}
+
+	// Description
+	if input.Description != "" {
+		formData.Set("description", input.Description)
+	}
+
+	// Cancel at period end
+	if input.CancelAtPeriodEnd {
+		formData.Set("cancel_at_period_end", "true")
+	}
+
+	// Billing cycle anchor
+	if input.BillingCycleAnchor > 0 {
+		formData.Set("billing_cycle_anchor", fmt.Sprintf("%d", input.BillingCycleAnchor))
+	}
+
+	// Default payment method
+	if input.DefaultPaymentMethod != "" {
+		formData.Set("default_payment_method", input.DefaultPaymentMethod)
+	}
+
+	// Metadata
+	for k, v := range input.Metadata {
+		formData.Set("metadata["+k+"]", v)
 	}
 
 	resp, err := c.doRequest("POST", "/subscriptions", formData)
@@ -576,4 +627,164 @@ func (c *Client) CreateSubscription(customerID, priceID string, paymentBehavior 
 	}
 
 	return &subscription, nil
+}
+
+// ListCoupons returns a list of coupons
+func (c *Client) ListCoupons(limit int, startingAfter string) (*CouponList, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	params := url.Values{}
+	params.Set("limit", fmt.Sprintf("%d", limit))
+	if startingAfter != "" {
+		params.Set("starting_after", startingAfter)
+	}
+
+	path := "/coupons?" + params.Encode()
+	resp, err := c.doRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var result CouponList
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetCoupon returns a single coupon by ID
+func (c *Client) GetCoupon(id string) (*Coupon, error) {
+	path := "/coupons/" + id
+	resp, err := c.doRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, NewAPIError(404, "coupon not found")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var coupon Coupon
+	if err := json.NewDecoder(resp.Body).Decode(&coupon); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &coupon, nil
+}
+
+// CreateCoupon creates a new coupon
+func (c *Client) CreateCoupon(input CouponInput) (*Coupon, error) {
+	formData := url.Values{}
+
+	// ID is optional - if not provided, Stripe generates one
+	if input.ID != "" {
+		formData.Set("id", input.ID)
+	}
+
+	// Name
+	if input.Name != "" {
+		formData.Set("name", input.Name)
+	}
+
+	// Duration is required
+	formData.Set("duration", input.Duration)
+
+	// Duration in months (required if duration=repeating)
+	if input.Duration == "repeating" && input.DurationInMonths > 0 {
+		formData.Set("duration_in_months", fmt.Sprintf("%d", input.DurationInMonths))
+	}
+
+	// Either percent_off OR amount_off (not both)
+	if input.PercentOff > 0 {
+		formData.Set("percent_off", fmt.Sprintf("%.2f", input.PercentOff))
+	} else if input.AmountOff > 0 {
+		formData.Set("amount_off", fmt.Sprintf("%d", input.AmountOff))
+		if input.Currency != "" {
+			formData.Set("currency", input.Currency)
+		} else {
+			formData.Set("currency", "usd")
+		}
+	}
+
+	// Max redemptions
+	if input.MaxRedemptions > 0 {
+		formData.Set("max_redemptions", fmt.Sprintf("%d", input.MaxRedemptions))
+	}
+
+	// Redeem by (expiration)
+	if input.RedeemBy > 0 {
+		formData.Set("redeem_by", fmt.Sprintf("%d", input.RedeemBy))
+	}
+
+	resp, err := c.doRequest("POST", "/coupons", formData)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, c.parseError(resp)
+	}
+
+	var coupon Coupon
+	if err := json.NewDecoder(resp.Body).Decode(&coupon); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &coupon, nil
+}
+
+// UpdateCoupon updates an existing coupon (only name and metadata can be updated)
+func (c *Client) UpdateCoupon(id string, name string) (*Coupon, error) {
+	formData := url.Values{}
+	if name != "" {
+		formData.Set("name", name)
+	}
+
+	path := "/coupons/" + id
+	resp, err := c.doRequest("POST", path, formData)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var coupon Coupon
+	if err := json.NewDecoder(resp.Body).Decode(&coupon); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &coupon, nil
+}
+
+// DeleteCoupon deletes a coupon
+func (c *Client) DeleteCoupon(id string) error {
+	path := "/coupons/" + id
+	resp, err := c.doRequest("DELETE", path, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return c.parseError(resp)
+	}
+
+	return nil
 }

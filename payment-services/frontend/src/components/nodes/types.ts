@@ -38,6 +38,9 @@ export interface NodeContext {
   // Dialog/action operations - Edit
   editCustomer: (connectionId: number, customer: Customer, platformType?: string) => void
   editProduct: (connectionId: number, product: Product, platformType?: string) => void
+  // Coupon operations (Stripe only)
+  onCreateCoupon?: (connectionId: number) => void
+  onDeleteCoupon?: (connectionId: number, couponId: string) => void
   // Connection operations
   testConnection: (connectionId: number) => void
   deleteConnection: (connectionId: number) => void
