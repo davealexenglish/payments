@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/davealexenglish/payment-billing-hub/backend/internal/platforms/zuora"
@@ -178,6 +179,11 @@ func (s *Server) handleZuoraListAccounts(w http.ResponseWriter, r *http.Request)
 	for i, account := range accounts {
 		customers[i] = accountToCustomer(account)
 	}
+
+	// Sort by organization name (ascending)
+	sort.Slice(customers, func(i, j int) bool {
+		return customers[i].Organization < customers[j].Organization
+	})
 
 	respondJSON(w, http.StatusOK, customers)
 }
@@ -393,6 +399,30 @@ func (s *Server) handleZuoraListInvoices(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, http.StatusOK, result)
 }
 
+// PaymentFromZuora converts Zuora Payment to frontend format
+type PaymentFromZuora struct {
+	ID            string `json:"id"`
+	TransactionID string `json:"transaction_id,omitempty"`
+	AmountInCents int64  `json:"amount_in_cents"`
+	Status        string `json:"status,omitempty"`
+	PaymentDate   string `json:"payment_date,omitempty"`
+	CreatedAt     string `json:"created_at,omitempty"`
+}
+
+func paymentToFrontend(payment zuora.Payment) PaymentFromZuora {
+	result := PaymentFromZuora{
+		ID:            payment.ID,
+		TransactionID: payment.PaymentNumber,
+		AmountInCents: int64(payment.Amount * 100),
+		Status:        payment.Status,
+		PaymentDate:   payment.EffectiveDate,
+	}
+	if payment.CreatedDate != nil {
+		result.CreatedAt = payment.CreatedDate.Format("2006-01-02T15:04:05Z")
+	}
+	return result
+}
+
 func (s *Server) handleZuoraListPayments(w http.ResponseWriter, r *http.Request) {
 	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
 	if err != nil {
@@ -400,10 +430,26 @@ func (s *Server) handleZuoraListPayments(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Payments in Zuora are separate objects
-	_ = connectionID
-	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"payments": []interface{}{},
-		"note":     "Zuora payments endpoint not yet implemented. Payments are accessed via the /v1/payments API.",
-	})
+	client, err := s.getZuoraClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+
+	payments, err := client.ListPayments(page, pageSize)
+	if err != nil {
+		respondZuoraAPIError(w, err)
+		return
+	}
+
+	// Convert to frontend format
+	result := make([]PaymentFromZuora, len(payments))
+	for i, payment := range payments {
+		result[i] = paymentToFrontend(payment)
+	}
+
+	respondJSON(w, http.StatusOK, result)
 }

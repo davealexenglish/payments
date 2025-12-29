@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import api, { type TreeNode, type Customer, type Subscription, type Product, type Invoice, type ProductFamily, type StripeCoupon } from '../api'
 import type { SelectedNode } from '../App'
-import { getNodeHandler, type TreeNodeData, type NodeContext, type MenuItem } from './nodes'
+import { getNodeHandler, type TreeNodeData, type NodeContext, type MenuItem, type ConnectionData } from './nodes'
 
 interface TreeViewProps {
   onSelectNode: (node: SelectedNode) => void
@@ -15,6 +15,8 @@ interface TreeViewProps {
   onEditProduct: (connectionId: number, product: Product, platformType?: string) => void
   onCreateCoupon?: (connectionId: number) => void
   onDeleteCoupon?: (connectionId: number, couponId: string) => void
+  onAddConnection: (platformType: 'maxio' | 'stripe' | 'zuora') => void
+  onEditConnection: (connectionId: number, platformType: string, connectionData: ConnectionData) => void
 }
 
 interface ContextMenuState {
@@ -25,7 +27,7 @@ interface ContextMenuState {
 
 const ICON_SIZE = 14
 
-export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onDeleteCoupon }: TreeViewProps) {
+export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onDeleteCoupon, onAddConnection, onEditConnection }: TreeViewProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -100,6 +102,8 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
       editProduct: onEditProduct,
       onCreateCoupon,
       onDeleteCoupon,
+      addConnection: onAddConnection,
+      editConnection: onEditConnection,
       testConnection: handleTestConnection,
       deleteConnection: handleDeleteConnection,
     }
@@ -108,7 +112,7 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
     if (items.length > 0) {
       setContextMenu({ x: e.clientX, y: e.clientY, items })
     }
-  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onDeleteCoupon])
+  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onDeleteCoupon, onAddConnection, onEditConnection])
 
   const handleTestConnection = useCallback(
     async (connectionId: number) => {
@@ -240,7 +244,7 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
   }
 
   if (!tree || tree.length === 0) {
-    return <div className="tree-empty">No connections. Click "Add Connection" to get started.</div>
+    return <div className="tree-empty">No connections. Right-click on a vendor to add a connection.</div>
   }
 
   return (

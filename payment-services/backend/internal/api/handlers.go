@@ -310,7 +310,7 @@ func (s *Server) handleTestConnection(w http.ResponseWriter, r *http.Request) {
 // Tree handler
 func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Pool().Query(context.Background(), `
-		SELECT id, platform_type, name, status
+		SELECT id, platform_type, name, COALESCE(subdomain, ''), COALESCE(base_url, ''), is_sandbox, status
 		FROM platform_connections
 		ORDER BY name
 	`)
@@ -350,10 +350,24 @@ func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var id int64
-		var platformType, name, status string
-		if err := rows.Scan(&id, &platformType, &name, &status); err != nil {
+		var platformType, name, subdomain, baseURL, status string
+		var isSandbox bool
+		if err := rows.Scan(&id, &platformType, &name, &subdomain, &baseURL, &isSandbox, &status); err != nil {
 			respondError(w, http.StatusInternalServerError, err.Error())
 			return
+		}
+
+		// Build connection data for the frontend
+		connectionData := map[string]interface{}{
+			"id":         id,
+			"name":       name,
+			"is_sandbox": isSandbox,
+		}
+		if subdomain != "" {
+			connectionData["subdomain"] = subdomain
+		}
+		if baseURL != "" {
+			connectionData["base_url"] = baseURL
 		}
 
 		// Create connection node with entity containers
@@ -420,6 +434,7 @@ func (s *Server) handleGetTree(w http.ResponseWriter, r *http.Request) {
 			PlatformType: platformType,
 			IsExpandable: true,
 			Children:     children,
+			Data:         connectionData,
 		}
 
 		// Add connection to the appropriate vendor node

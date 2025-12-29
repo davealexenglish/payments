@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TreeView } from './components/TreeView'
 import { PropertiesPanel } from './components/PropertiesPanel'
 import { Toolbar } from './components/Toolbar'
-import { PlatformConnectionDialog } from './components/dialogs/PlatformConnectionDialog'
 import { ToastProvider } from './components/Toast'
 // Stripe dialogs
 import {
@@ -12,6 +11,7 @@ import {
   CreateStripePriceDialog,
   CreateStripeSubscriptionDialog,
   CreateStripeCouponDialog,
+  StripeConnectionDialog,
 } from './components/dialogs/stripe'
 // Maxio dialogs
 import {
@@ -19,8 +19,12 @@ import {
   CreateMaxioProductFamilyDialog,
   CreateMaxioProductDialog,
   CreateMaxioSubscriptionDialog,
+  MaxioConnectionDialog,
 } from './components/dialogs/maxio'
-import type { ProductFamily, Customer, Product, PlatformConnection } from './api'
+// Zuora dialogs
+import { ZuoraConnectionDialog } from './components/dialogs/zuora'
+import type { ProductFamily, Customer, Product } from './api'
+import type { ConnectionData } from './components/nodes/types'
 import './App.css'
 
 const queryClient = new QueryClient()
@@ -32,14 +36,6 @@ export interface SelectedNode {
   data: unknown
   connectionId?: number
   platformType?: string
-}
-
-// Helper to extract platform type from vendor node type
-function getPlatformTypeFromVendorNode(nodeType: string): PlatformConnection['platform_type'] | null {
-  if (nodeType === 'vendor-maxio') return 'maxio'
-  if (nodeType === 'vendor-stripe') return 'stripe'
-  if (nodeType === 'vendor-zuora') return 'zuora'
-  return null
 }
 
 // Dialog state types
@@ -76,11 +72,24 @@ interface CouponDialogState {
   connectionId: number | null
 }
 
+interface ConnectionDialogState {
+  show: boolean
+  mode: 'create' | 'edit'
+  platformType: 'maxio' | 'stripe' | 'zuora' | null
+  connectionId: number | null
+  connectionData: ConnectionData | null
+}
+
 function App() {
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
   const [treePanelWidth, setTreePanelWidth] = useState(300)
-  const [showConnectionDialog, setShowConnectionDialog] = useState(false)
-  const [connectionDialogPlatformType, setConnectionDialogPlatformType] = useState<PlatformConnection['platform_type'] | null>(null)
+  const [connectionDialog, setConnectionDialog] = useState<ConnectionDialogState>({
+    show: false,
+    mode: 'create',
+    platformType: null,
+    connectionId: null,
+    connectionData: null,
+  })
 
   // Dialog states
   const [customerDialog, setCustomerDialog] = useState<CustomerDialogState>({
@@ -203,6 +212,36 @@ function App() {
     } catch (err) {
       console.error('Delete coupon failed:', err)
     }
+  }, [])
+
+  const handleAddConnection = useCallback((platformType: 'maxio' | 'stripe' | 'zuora') => {
+    setConnectionDialog({
+      show: true,
+      mode: 'create',
+      platformType,
+      connectionId: null,
+      connectionData: null,
+    })
+  }, [])
+
+  const handleEditConnection = useCallback((connectionId: number, platformType: string, connectionData: ConnectionData) => {
+    setConnectionDialog({
+      show: true,
+      mode: 'edit',
+      platformType: platformType as 'maxio' | 'stripe' | 'zuora',
+      connectionId,
+      connectionData,
+    })
+  }, [])
+
+  const closeConnectionDialog = useCallback(() => {
+    setConnectionDialog({
+      show: false,
+      mode: 'create',
+      platformType: null,
+      connectionId: null,
+      connectionData: null,
+    })
   }, [])
 
   const handleRefreshTree = useCallback(() => {
@@ -391,6 +430,64 @@ function App() {
     )
   }
 
+  // Render vendor-specific connection dialog
+  const renderConnectionDialog = () => {
+    if (!connectionDialog.show || !connectionDialog.platformType) return null
+
+    const { mode, platformType, connectionId, connectionData } = connectionDialog
+    const onSuccess = () => {
+      closeConnectionDialog()
+      handleRefreshTree()
+    }
+
+    switch (platformType) {
+      case 'maxio':
+        return (
+          <MaxioConnectionDialog
+            connectionId={mode === 'edit' ? connectionId ?? undefined : undefined}
+            existingData={mode === 'edit' && connectionData ? {
+              name: connectionData.name,
+              subdomain: connectionData.subdomain || '',
+              is_sandbox: connectionData.is_sandbox,
+              api_key: connectionData.api_key,
+            } : undefined}
+            onClose={closeConnectionDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      case 'stripe':
+        return (
+          <StripeConnectionDialog
+            connectionId={mode === 'edit' ? connectionId ?? undefined : undefined}
+            existingData={mode === 'edit' && connectionData ? {
+              name: connectionData.name,
+              is_sandbox: connectionData.is_sandbox,
+              api_key: connectionData.api_key,
+            } : undefined}
+            onClose={closeConnectionDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      case 'zuora':
+        return (
+          <ZuoraConnectionDialog
+            connectionId={mode === 'edit' ? connectionId ?? undefined : undefined}
+            existingData={mode === 'edit' && connectionData ? {
+              name: connectionData.name,
+              base_url: connectionData.base_url || 'https://rest.sandbox.na.zuora.com',
+              is_sandbox: connectionData.is_sandbox,
+              client_id: connectionData.client_id,
+              client_secret: connectionData.client_secret,
+            } : undefined}
+            onClose={closeConnectionDialog}
+            onSuccess={onSuccess}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
@@ -401,17 +498,7 @@ function App() {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <Toolbar
-          selectedNode={selectedNode}
-          onAddConnection={() => {
-            const platformType = selectedNode ? getPlatformTypeFromVendorNode(selectedNode.type) : null
-            if (platformType) {
-              setConnectionDialogPlatformType(platformType)
-              setShowConnectionDialog(true)
-            }
-          }}
-          onRefresh={handleRefreshTree}
-        />
+        <Toolbar onRefresh={handleRefreshTree} />
         <div className="main-layout">
           {/* Left: Tree Panel */}
           <div className="panel tree-panel" style={{ width: treePanelWidth }}>
@@ -427,6 +514,8 @@ function App() {
                 onEditProduct={handleEditProduct}
                 onCreateCoupon={handleCreateCoupon}
                 onDeleteCoupon={handleDeleteCoupon}
+                onAddConnection={handleAddConnection}
+                onEditConnection={handleEditConnection}
               />
             </div>
           </div>
@@ -448,21 +537,8 @@ function App() {
           </div>
         </div>
 
-        {/* Connection Dialog */}
-        {showConnectionDialog && connectionDialogPlatformType && (
-          <PlatformConnectionDialog
-            platformType={connectionDialogPlatformType}
-            onClose={() => {
-              setShowConnectionDialog(false)
-              setConnectionDialogPlatformType(null)
-            }}
-            onSuccess={() => {
-              setShowConnectionDialog(false)
-              setConnectionDialogPlatformType(null)
-              handleRefreshTree()
-            }}
-          />
-        )}
+        {/* Connection dialogs */}
+        {renderConnectionDialog()}
 
         {/* Vendor-specific dialogs */}
         {renderCustomerDialog()}

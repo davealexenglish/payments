@@ -33,6 +33,7 @@ type Account struct {
 	Name          string     `json:"name"`
 	Status        string     `json:"status,omitempty"`
 	Currency      string     `json:"currency,omitempty"`
+	Balance       float64    `json:"balance,omitempty"`
 	PaymentTerm   string     `json:"paymentTerm,omitempty"`
 	BillCycleDay  int        `json:"billCycleDay,omitempty"`
 	AutoPay       bool       `json:"autoPay,omitempty"`
@@ -184,4 +185,25 @@ type InvoicesResponse struct {
 	Invoices []Invoice `json:"invoices"`
 	NextPage string    `json:"nextPage,omitempty"`
 	Success  bool      `json:"success"`
+}
+
+// ZOQLQueryResponse represents the response from a ZOQL query
+type ZOQLQueryResponse struct {
+	Done         bool                     `json:"done"`
+	Records      []map[string]interface{} `json:"records"`
+	Size         int                      `json:"size"`
+	QueryLocator string                   `json:"queryLocator,omitempty"`
+}
+
+// Payment represents a Zuora payment
+type Payment struct {
+	ID              string     `json:"id"`
+	PaymentNumber   string     `json:"paymentNumber,omitempty"`
+	AccountID       string     `json:"accountId,omitempty"`
+	Amount          float64    `json:"amount,omitempty"`
+	EffectiveDate   string     `json:"effectiveDate,omitempty"`
+	Status          string     `json:"status,omitempty"`
+	Type            string     `json:"type,omitempty"`
+	PaymentMethodID string     `json:"paymentMethodId,omitempty"`
+	CreatedDate     *time.Time `json:"createdDate,omitempty"`
 }
