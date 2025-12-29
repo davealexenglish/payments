@@ -23,6 +23,7 @@ export { ProductFamiliesNode, ProductFamilyNode, ProductNode } from './ProductNo
 export { SubscriptionsNode, SubscriptionNode } from './SubscriptionNodes'
 export { InvoicesNode, InvoiceNode } from './InvoiceNodes'
 export { PaymentsNode, PaymentNode } from './PaymentNodes'
+export { CouponsNode, CouponNode } from './CouponNodes'
 
 // Import handlers for registry
 import type { NodeHandler } from './types'
@@ -34,6 +35,7 @@ import { ProductFamiliesNode, ProductFamilyNode, ProductNode } from './ProductNo
 import { SubscriptionsNode, SubscriptionNode } from './SubscriptionNodes'
 import { InvoicesNode, InvoiceNode } from './InvoiceNodes'
 import { PaymentsNode, PaymentNode } from './PaymentNodes'
+import { CouponsNode, CouponNode } from './CouponNodes'
 
 // Node type registry - maps node.type to handler
 export const nodeRegistry: Record<string, NodeHandler> = {
@@ -56,6 +58,7 @@ export const nodeRegistry: Record<string, NodeHandler> = {
   'product-families': ProductFamiliesNode,
   'invoices': InvoicesNode,
   'payments': PaymentsNode,
+  'coupons': CouponsNode,
 
   // Entity nodes (individual items)
   'customer': CustomerNode,
@@ -64,6 +67,7 @@ export const nodeRegistry: Record<string, NodeHandler> = {
   'product': ProductNode,
   'invoice': InvoiceNode,
   'payment': PaymentNode,
+  'coupon': CouponNode,
 }
 
 /**

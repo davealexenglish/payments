@@ -91,6 +91,11 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("GET /api/stripe/{connectionId}/invoices", s.handleStripeListInvoices)
 	mux.HandleFunc("GET /api/stripe/{connectionId}/invoices/{invoiceId}", s.handleStripeGetInvoice)
 	mux.HandleFunc("GET /api/stripe/{connectionId}/payments", s.handleStripeListPayments)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/coupons", s.handleStripeListCoupons)
+	mux.HandleFunc("POST /api/stripe/{connectionId}/coupons", s.handleStripeCreateCoupon)
+	mux.HandleFunc("GET /api/stripe/{connectionId}/coupons/{couponId}", s.handleStripeGetCoupon)
+	mux.HandleFunc("PUT /api/stripe/{connectionId}/coupons/{couponId}", s.handleStripeUpdateCoupon)
+	mux.HandleFunc("DELETE /api/stripe/{connectionId}/coupons/{couponId}", s.handleStripeDeleteCoupon)
 
 	// User preferences
 	mux.HandleFunc("GET /api/preferences/{key}", s.handleGetPreference)

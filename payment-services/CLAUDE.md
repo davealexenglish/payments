@@ -71,6 +71,14 @@ Customer and Product dialogs support both create and edit modes:
 - Product Families: GET/POST list, GET products by family
 - Invoices, Payments: GET list
 
+**Stripe** (`/api/stripe/{connectionId}/...`)
+- Customers: GET/POST list, GET individual
+- Products: GET/POST list, GET individual (maps to Product Families in frontend)
+- Prices: GET/POST list, GET individual (maps to Products in frontend)
+- Subscriptions: GET/POST list, GET individual
+- Invoices, Payments: GET list
+- Coupons: GET/POST/PUT/DELETE list and individual (Stripe-only feature)
+
 **Zuora** (`/api/zuora/{connectionId}/...`)
 - Accounts: GET list, GET individual (maps to Customers in frontend)
 - Subscriptions: GET list, GET individual
@@ -87,11 +95,13 @@ backend/
     │   ├── server.go            # Router, Server struct with client caches
     │   ├── handlers.go          # Connection CRUD, tree structure, generic handlers
     │   ├── handlers_maxio.go    # Maxio-specific API handlers
+    │   ├── handlers_stripe.go   # Stripe-specific API handlers
     │   └── handlers_zuora.go    # Zuora-specific API handlers
     ├── db/db.go                 # PostgreSQL connection, migrations
     ├── models/models.go         # Shared types (TreeNode, CreateConnectionRequest, etc.)
     └── platforms/
         ├── maxio/               # Maxio API client + types
+        ├── stripe/              # Stripe API client + types
         └── zuora/               # Zuora API client + types (OAuth token management)
 ```
 
@@ -109,8 +119,11 @@ frontend/src/
     │   ├── PlatformNodes.tsx    # connection nodes
     │   ├── CustomerNodes.tsx    # customers container + customer entities
     │   ├── ProductNodes.tsx     # product-families, product-family, product
+    │   ├── CouponNodes.tsx      # coupons container + coupon entities (Stripe only)
     │   └── ...                  # SubscriptionNodes, InvoiceNodes, PaymentNodes
     └── dialogs/                 # Modal dialogs for create/edit operations
+        ├── maxio/               # Maxio-specific dialogs (Customer, Product, Subscription, etc.)
+        └── stripe/              # Stripe-specific dialogs (Customer, Product, Price, Subscription, Coupon)
 ```
 
 ## Reference Materials
@@ -202,3 +215,7 @@ helm rollback billing-hub <REVISION> -n billing-hub
 # Port-forward to access the app
 kubectl port-forward -n billing-hub svc/frontend 8081:80
 ```
+
+### Current Deployed Versions
+- Backend: `0.1.16`
+- Frontend: `0.1.25`

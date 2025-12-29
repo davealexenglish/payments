@@ -1,18 +1,22 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api, { type ProductFamily, type Product, createStripePrice } from '../../api'
-import { useToast } from '../Toast'
+import api, { type ProductFamily, type Product } from '../../../api'
+import { useToast } from '../../Toast'
 
-interface CreateProductDialogProps {
+interface CreateMaxioProductDialogProps {
   connectionId: number
-  platformType: string
-  productFamily?: ProductFamily // Required for create mode (in Stripe, this is the Product)
-  product?: Product // If provided, edit mode
+  productFamily: ProductFamily
+  product?: Product  // If provided, edit mode
   onClose: () => void
   onSuccess: () => void
 }
 
-export function CreateProductDialog({ connectionId, platformType, productFamily, product, onClose, onSuccess }: CreateProductDialogProps) {
+/**
+ * Maxio Product creation/edit dialog
+ * Maps to: POST /product_families/{product_family_id}/products.json
+ * https://developers.maxio.com/docs/api-docs/products
+ */
+export function CreateMaxioProductDialog({ connectionId, productFamily, product, onClose, onSuccess }: CreateMaxioProductDialogProps) {
   const isEditMode = !!product
   const [name, setName] = useState(product?.name || '')
   const [handle, setHandle] = useState(product?.handle || '')
@@ -22,25 +26,12 @@ export function CreateProductDialog({ connectionId, platformType, productFamily,
   const [intervalUnit, setIntervalUnit] = useState(product?.interval_unit || 'month')
   const { showToast } = useToast()
 
-  // Get family name for display (in Stripe, this is the Product name)
-  const familyName = isEditMode ? product?.product_family?.name : productFamily?.name
-
   const createMutation = useMutation({
     mutationFn: (data: { name: string; handle?: string; description?: string; price_in_cents: number; interval: number; interval_unit: string }) => {
-      if (platformType === 'stripe') {
-        // For Stripe, create a Price under the Product (productFamily is the Stripe Product)
-        return createStripePrice(connectionId, String(productFamily!.id), {
-          price_in_cents: data.price_in_cents,
-          interval: data.interval,
-          interval_unit: data.interval_unit,
-        })
-      }
-      if (platformType !== 'maxio') {
-        throw new Error(`Product creation for ${platformType} is not yet fully implemented`)
-      }
-      return api.createMaxioProduct(connectionId, String(productFamily!.id), data)
+      return api.createMaxioProduct(connectionId, productFamily.id, data)
     },
     onSuccess: () => {
+      showToast('Product created successfully', 'success')
       onSuccess()
     },
     onError: (err) => {
@@ -50,12 +41,10 @@ export function CreateProductDialog({ connectionId, platformType, productFamily,
 
   const updateMutation = useMutation({
     mutationFn: (data: { name: string; handle?: string; description?: string; price_in_cents: number; interval: number; interval_unit: string }) => {
-      if (platformType !== 'maxio') {
-        throw new Error(`Product update for ${platformType} is not yet fully implemented`)
-      }
-      return api.updateMaxioProduct(connectionId, String(product!.id), data)
+      return api.updateMaxioProduct(connectionId, product!.id, data)
     },
     onSuccess: () => {
+      showToast('Product updated successfully', 'success')
       onSuccess()
     },
     onError: (err) => {
@@ -95,26 +84,24 @@ export function CreateProductDialog({ connectionId, platformType, productFamily,
     })
   }
 
-  // Convert cents to dollar display for helper text
+  // Convert cents to dollar display
   const priceDisplay = priceInCents ? `$${(parseInt(priceInCents, 10) / 100).toFixed(2)}` : '$0.00'
 
   return (
     <div className="modal-overlay">
       <div className="modal-dialog">
         <div className="modal-header">
-          {isEditMode ? 'Edit Product' : 'Create Product'}
+          {isEditMode ? 'Edit Maxio Product' : 'Create Maxio Product'}
           <button className="modal-close" onClick={onClose}>
             &times;
           </button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {familyName && (
-              <div className="form-group">
-                <label className="form-label">Product Family</label>
-                <div className="form-static">{familyName}</div>
-              </div>
-            )}
+            <div className="form-group">
+              <label className="form-label">Product Family</label>
+              <div className="form-static">{productFamily.name}</div>
+            </div>
 
             <div className="form-group">
               <label className="form-label">Name *</label>

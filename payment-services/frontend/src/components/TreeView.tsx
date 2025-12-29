@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, ChevronDown } from 'lucide-react'
-import api, { type TreeNode, type Customer, type Subscription, type Product, type Invoice, type ProductFamily } from '../api'
+import api, { type TreeNode, type Customer, type Subscription, type Product, type Invoice, type ProductFamily, type StripeCoupon } from '../api'
 import type { SelectedNode } from '../App'
 import { getNodeHandler, type TreeNodeData, type NodeContext, type MenuItem } from './nodes'
 
@@ -13,6 +13,8 @@ interface TreeViewProps {
   onCreateProduct: (connectionId: number, productFamily: ProductFamily, platformType?: string) => void
   onEditCustomer: (connectionId: number, customer: Customer, platformType?: string) => void
   onEditProduct: (connectionId: number, product: Product, platformType?: string) => void
+  onCreateCoupon?: (connectionId: number) => void
+  onDeleteCoupon?: (connectionId: number, couponId: string) => void
 }
 
 interface ContextMenuState {
@@ -23,7 +25,7 @@ interface ContextMenuState {
 
 const ICON_SIZE = 14
 
-export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct }: TreeViewProps) {
+export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onDeleteCoupon }: TreeViewProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -96,6 +98,8 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
       createProduct: onCreateProduct,
       editCustomer: onEditCustomer,
       editProduct: onEditProduct,
+      onCreateCoupon,
+      onDeleteCoupon,
       testConnection: handleTestConnection,
       deleteConnection: handleDeleteConnection,
     }
@@ -104,7 +108,7 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
     if (items.length > 0) {
       setContextMenu({ x: e.clientX, y: e.clientY, items })
     }
-  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct])
+  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onDeleteCoupon])
 
   const handleTestConnection = useCallback(
     async (connectionId: number) => {
@@ -260,7 +264,7 @@ interface LazyEntityListProps {
   onToggleNode: (nodeId: string) => void
 }
 
-type EntityItem = Customer | Subscription | Product | Invoice | ProductFamily
+type EntityItem = Customer | Subscription | Product | Invoice | ProductFamily | StripeCoupon
 
 function LazyEntityList({
   type,
@@ -310,6 +314,8 @@ function LazyEntityList({
           return api.listStripeProducts(connectionId)
         case 'invoices':
           return api.listStripeInvoices(connectionId)
+        case 'coupons':
+          return api.listStripeCoupons(connectionId)
         default:
           return []
       }
@@ -355,6 +361,7 @@ function LazyEntityList({
       case 'subscriptions': return 'subscription'
       case 'product-families': return 'product-family'
       case 'invoices': return 'invoice'
+      case 'coupons': return 'coupon'
       default: return type.slice(0, -1)
     }
   }

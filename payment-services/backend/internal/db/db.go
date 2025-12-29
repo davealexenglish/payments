@@ -45,6 +45,7 @@ func (db *DB) Pool() *pgxpool.Pool {
 func (db *DB) Migrate() error {
 	migrations := []string{
 		"migrations/001_initial_schema.sql",
+		"migrations/002_add_base_url.sql",
 	}
 
 	for _, migrationPath := range migrations {

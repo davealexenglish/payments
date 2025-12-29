@@ -1,59 +1,56 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api, { createStripeProduct } from '../../api'
+import api from '../../../api'
+import { useToast } from '../../Toast'
 
-interface CreateProductFamilyDialogProps {
+interface CreateMaxioProductFamilyDialogProps {
   connectionId: number
-  platformType: string
   onClose: () => void
   onSuccess: () => void
 }
 
-export function CreateProductFamilyDialog({ connectionId, platformType, onClose, onSuccess }: CreateProductFamilyDialogProps) {
+/**
+ * Maxio Product Family creation dialog
+ * Maps to: POST /product_families.json
+ * https://developers.maxio.com/docs/api-docs/product-families
+ */
+export function CreateMaxioProductFamilyDialog({ connectionId, onClose, onSuccess }: CreateMaxioProductFamilyDialogProps) {
   const [name, setName] = useState('')
   const [handle, setHandle] = useState('')
   const [description, setDescription] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
-  // For Stripe, "Product Family" maps to creating a Product (which can have multiple Prices)
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; handle?: string; description?: string }) => {
-      if (platformType === 'stripe') {
-        return createStripeProduct(connectionId, { name: data.name, description: data.description })
-      }
-      // Zuora doesn't support creating products via API in the same way
-      // For now, only Maxio and Stripe are supported
-      return api.createMaxioProductFamily(connectionId, data)
-    },
+    mutationFn: () => api.createMaxioProductFamily(connectionId, {
+      name: name.trim(),
+      handle: handle.trim() || undefined,
+      description: description.trim() || undefined,
+    }),
     onSuccess: () => {
+      showToast('Product Family created successfully', 'success')
       onSuccess()
     },
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Failed to create product family')
+      showToast(err, 'error')
     },
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
 
     if (!name.trim()) {
-      setError('Name is required')
+      showToast('Name is required', 'error')
       return
     }
 
-    createMutation.mutate({
-      name: name.trim(),
-      handle: handle.trim() || undefined,
-      description: description.trim() || undefined,
-    })
+    createMutation.mutate()
   }
 
   return (
     <div className="modal-overlay">
       <div className="modal-dialog">
         <div className="modal-header">
-          Create Product Family
+          Create Maxio Product Family
           <button className="modal-close" onClick={onClose}>
             &times;
           </button>
@@ -67,7 +64,7 @@ export function CreateProductFamilyDialog({ connectionId, platformType, onClose,
                 className="form-input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Basic Plans"
+                placeholder="e.g., SaaS Plans"
               />
             </div>
 
@@ -78,11 +75,9 @@ export function CreateProductFamilyDialog({ connectionId, platformType, onClose,
                 className="form-input"
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
-                placeholder="e.g., basic-plans"
+                placeholder="e.g., saas-plans"
               />
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                URL-friendly identifier (auto-generated if empty)
-              </div>
+              <div className="form-hint">URL-friendly identifier (auto-generated if empty)</div>
             </div>
 
             <div className="form-group">
@@ -95,8 +90,6 @@ export function CreateProductFamilyDialog({ connectionId, platformType, onClose,
                 rows={3}
               />
             </div>
-
-            {error && <div className="form-error">{error}</div>}
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -105,9 +98,9 @@ export function CreateProductFamilyDialog({ connectionId, platformType, onClose,
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || !name.trim()}
             >
-              {createMutation.isPending ? 'Creating...' : 'Create Family'}
+              {createMutation.isPending ? 'Creating...' : 'Create Product Family'}
             </button>
           </div>
         </form>

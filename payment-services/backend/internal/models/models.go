@@ -26,6 +26,7 @@ type PlatformConnection struct {
 	PlatformType PlatformType     `json:"platform_type"`
 	Name         string           `json:"name"`
 	Subdomain    string           `json:"subdomain,omitempty"`
+	BaseURL      string           `json:"base_url,omitempty"` // Used by Zuora for different data centers
 	IsSandbox    bool             `json:"is_sandbox"`
 	Status       ConnectionStatus `json:"status"`
 	ErrorMessage string           `json:"error_message,omitempty"`
@@ -119,6 +120,7 @@ type CreateConnectionRequest struct {
 	PlatformType PlatformType `json:"platform_type"`
 	Name         string       `json:"name"`
 	Subdomain    string       `json:"subdomain,omitempty"`     // Used by Maxio
+	BaseURL      string       `json:"base_url,omitempty"`      // Used by Zuora for different data centers
 	APIKey       string       `json:"api_key,omitempty"`       // Used by Maxio, Stripe
 	ClientID     string       `json:"client_id,omitempty"`     // Used by Zuora
 	ClientSecret string       `json:"client_secret,omitempty"` // Used by Zuora

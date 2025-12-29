@@ -13,6 +13,7 @@ export interface PlatformConnection {
   platform_type: 'maxio' | 'zuora' | 'stripe'
   name: string
   subdomain?: string
+  base_url?: string  // Used by Zuora for different data centers
   is_sandbox: boolean
   status: 'pending' | 'connected' | 'error'
   error_message?: string
@@ -284,11 +285,19 @@ export const listStripeCustomers = async (connectionId: number): Promise<Custome
   }))
 }
 
-export const createStripeCustomer = async (connectionId: number, req: CreateCustomerRequest): Promise<Customer> => {
+export interface StripeCustomerRequest {
+  name?: string
+  email: string
+  phone?: string
+  description?: string
+}
+
+export const createStripeCustomer = async (connectionId: number, req: StripeCustomerRequest): Promise<Customer> => {
   const stripeReq = {
-    name: `${req.first_name} ${req.last_name}`.trim(),
+    name: req.name,
     email: req.email,
-    description: req.organization,
+    phone: req.phone,
+    description: req.description,
   }
   const response = await api.post(`/api/stripe/${connectionId}/customers`, stripeReq)
   const c = response.data
@@ -335,15 +344,29 @@ export const listStripeSubscriptions = async (connectionId: number): Promise<Sub
   }))
 }
 
+// Stripe Subscription creation request
+// Maps to POST /v1/subscriptions - https://docs.stripe.com/api/subscriptions/create
+export interface StripeSubscriptionRequest {
+  customer_id: string
+  price_id: string
+  quantity?: number
+  collection_method?: 'charge_automatically' | 'send_invoice'
+  payment_behavior?: 'default_incomplete' | 'error_if_incomplete' | 'allow_incomplete' | 'pending_if_incomplete'
+  days_until_due?: number
+  trial_period_days?: number
+  coupon?: string
+  description?: string
+  cancel_at_period_end?: boolean
+  billing_cycle_anchor?: number
+  default_payment_method?: string
+  metadata?: Record<string, string>
+}
+
 export const createStripeSubscription = async (
   connectionId: number,
-  customerId: string,
-  priceId: string
+  req: StripeSubscriptionRequest
 ): Promise<Subscription> => {
-  const response = await api.post(`/api/stripe/${connectionId}/subscriptions`, {
-    customer_id: customerId,
-    price_id: priceId,
-  })
+  const response = await api.post(`/api/stripe/${connectionId}/subscriptions`, req)
   const s = response.data
   return {
     id: s.id,
@@ -374,15 +397,22 @@ export const listStripePrices = async (connectionId: number, productId: string):
   }))
 }
 
+export interface StripePriceRequest {
+  price_in_cents: number
+  currency: string
+  interval: number
+  interval_unit: string
+}
+
 export const createStripePrice = async (
   connectionId: number,
   productId: string,
-  req: { price_in_cents: number; interval: number; interval_unit: string }
+  req: StripePriceRequest
 ): Promise<Product> => {
   const response = await api.post(`/api/stripe/${connectionId}/prices`, {
     product_id: productId,
     unit_amount: req.price_in_cents,
-    currency: 'usd',
+    currency: req.currency,
     interval: req.interval_unit,
     interval_count: req.interval,
   })
@@ -407,6 +437,58 @@ export const listStripeInvoices = async (connectionId: number): Promise<Invoice[
     due_date: i.due_date ? new Date(i.due_date * 1000).toISOString() : undefined,
     created_at: i.created ? new Date(i.created * 1000).toISOString() : undefined,
   }))
+}
+
+// Stripe Coupon types
+export interface StripeCoupon {
+  id: string
+  name?: string
+  amount_off?: number
+  currency?: string
+  percent_off?: number
+  duration: 'once' | 'repeating' | 'forever'
+  duration_in_months?: number
+  max_redemptions?: number
+  redeem_by?: number
+  times_redeemed: number
+  valid: boolean
+  created: number
+}
+
+export interface StripeCouponRequest {
+  id?: string
+  name?: string
+  amount_off?: number
+  currency?: string
+  percent_off?: number
+  duration: 'once' | 'repeating' | 'forever'
+  duration_in_months?: number
+  max_redemptions?: number
+  redeem_by?: number
+}
+
+export const listStripeCoupons = async (connectionId: number): Promise<StripeCoupon[]> => {
+  const response = await api.get(`/api/stripe/${connectionId}/coupons`)
+  return response.data || []
+}
+
+export const getStripeCoupon = async (connectionId: number, couponId: string): Promise<StripeCoupon> => {
+  const response = await api.get(`/api/stripe/${connectionId}/coupons/${couponId}`)
+  return response.data
+}
+
+export const createStripeCoupon = async (connectionId: number, req: StripeCouponRequest): Promise<StripeCoupon> => {
+  const response = await api.post(`/api/stripe/${connectionId}/coupons`, req)
+  return response.data
+}
+
+export const updateStripeCoupon = async (connectionId: number, couponId: string, name: string): Promise<StripeCoupon> => {
+  const response = await api.put(`/api/stripe/${connectionId}/coupons/${couponId}`, { name })
+  return response.data
+}
+
+export const deleteStripeCoupon = async (connectionId: number, couponId: string): Promise<void> => {
+  await api.delete(`/api/stripe/${connectionId}/coupons/${couponId}`)
 }
 
 export default {
@@ -448,4 +530,9 @@ export default {
   createStripeProduct,
   listStripePrices,
   listStripeInvoices,
+  listStripeCoupons,
+  getStripeCoupon,
+  createStripeCoupon,
+  updateStripeCoupon,
+  deleteStripeCoupon,
 }

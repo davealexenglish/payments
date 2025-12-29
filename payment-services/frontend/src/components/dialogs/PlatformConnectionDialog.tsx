@@ -17,14 +17,34 @@ function getPlatformDisplayName(platformType: PlatformConnection['platform_type'
   }
 }
 
+// Zuora data center options
+const ZUORA_ENDPOINTS = [
+  { label: 'NA Sandbox', value: 'https://rest.sandbox.na.zuora.com', sandbox: true },
+  { label: 'EU Sandbox', value: 'https://rest.sandbox.eu.zuora.com', sandbox: true },
+  { label: 'US API Sandbox (Legacy)', value: 'https://rest.apisandbox.zuora.com', sandbox: true },
+  { label: 'NA Production', value: 'https://rest.na.zuora.com', sandbox: false },
+  { label: 'EU Production', value: 'https://rest.eu.zuora.com', sandbox: false },
+  { label: 'US Production (Legacy)', value: 'https://rest.zuora.com', sandbox: false },
+]
+
 export function PlatformConnectionDialog({ platformType, onClose, onSuccess }: PlatformConnectionDialogProps) {
   const [name, setName] = useState('')
   const [subdomain, setSubdomain] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
+  const [baseUrl, setBaseUrl] = useState('https://rest.sandbox.na.zuora.com')
   const [isSandbox, setIsSandbox] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Update isSandbox when base URL changes (for Zuora)
+  const handleBaseUrlChange = (url: string) => {
+    setBaseUrl(url)
+    const endpoint = ZUORA_ENDPOINTS.find(e => e.value === url)
+    if (endpoint) {
+      setIsSandbox(endpoint.sandbox)
+    }
+  }
 
   const createMutation = useMutation({
     mutationFn: api.createConnection,
@@ -72,6 +92,7 @@ export function PlatformConnectionDialog({ platformType, onClose, onSuccess }: P
       platform_type: platformType,
       name: name.trim(),
       subdomain: platformType === 'maxio' ? subdomain.trim() : undefined,
+      base_url: platformType === 'zuora' ? baseUrl : undefined,
       api_key: platformType !== 'zuora' ? apiKey.trim() : undefined,
       client_id: platformType === 'zuora' ? clientId.trim() : undefined,
       client_secret: platformType === 'zuora' ? clientSecret.trim() : undefined,
@@ -122,6 +143,23 @@ export function PlatformConnectionDialog({ platformType, onClose, onSuccess }: P
             {platformType === 'zuora' ? (
               <>
                 <div className="form-group">
+                  <label className="form-label">Data Center / Environment</label>
+                  <select
+                    className="form-input"
+                    value={baseUrl}
+                    onChange={(e) => handleBaseUrlChange(e.target.value)}
+                  >
+                    {ZUORA_ENDPOINTS.map(endpoint => (
+                      <option key={endpoint.value} value={endpoint.value}>
+                        {endpoint.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    API Endpoint: {baseUrl}
+                  </div>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Client ID</label>
                   <input
                     type="text"
@@ -155,16 +193,18 @@ export function PlatformConnectionDialog({ platformType, onClose, onSuccess }: P
               </div>
             )}
 
-            <div className="form-group">
-              <label className="form-checkbox">
-                <input
-                  type="checkbox"
-                  checked={isSandbox}
-                  onChange={(e) => setIsSandbox(e.target.checked)}
-                />
-                <span>Sandbox / Test Environment</span>
-              </label>
-            </div>
+            {platformType !== 'zuora' && (
+              <div className="form-group">
+                <label className="form-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={isSandbox}
+                    onChange={(e) => setIsSandbox(e.target.checked)}
+                  />
+                  <span>Sandbox / Test Environment</span>
+                </label>
+              </div>
+            )}
 
             {error && <div className="form-error">{error}</div>}
           </div>

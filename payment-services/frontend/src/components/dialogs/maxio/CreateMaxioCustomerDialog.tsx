@@ -1,17 +1,21 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import api, { type Customer, createStripeCustomer, updateStripeCustomer, createZuoraAccount } from '../../api'
-import { useToast } from '../Toast'
+import api, { type Customer } from '../../../api'
+import { useToast } from '../../Toast'
 
-interface CreateCustomerDialogProps {
+interface CreateMaxioCustomerDialogProps {
   connectionId: number
-  platformType: string
-  customer?: Customer // If provided, edit mode
+  customer?: Customer  // If provided, edit mode
   onClose: () => void
   onSuccess: () => void
 }
 
-export function CreateCustomerDialog({ connectionId, platformType, customer, onClose, onSuccess }: CreateCustomerDialogProps) {
+/**
+ * Maxio Customer creation/edit dialog
+ * Maps to: POST /customers.json or PUT /customers/{customer_id}.json
+ * https://developers.maxio.com/docs/api-docs/customers
+ */
+export function CreateMaxioCustomerDialog({ connectionId, customer, onClose, onSuccess }: CreateMaxioCustomerDialogProps) {
   const isEditMode = !!customer
   const [firstName, setFirstName] = useState(customer?.first_name || '')
   const [lastName, setLastName] = useState(customer?.last_name || '')
@@ -22,14 +26,10 @@ export function CreateCustomerDialog({ connectionId, platformType, customer, onC
 
   const createMutation = useMutation({
     mutationFn: (data: { first_name: string; last_name: string; email: string; organization?: string; reference?: string }) => {
-      if (platformType === 'stripe') {
-        return createStripeCustomer(connectionId, data)
-      } else if (platformType === 'zuora') {
-        return createZuoraAccount(connectionId, data)
-      }
       return api.createMaxioCustomer(connectionId, data)
     },
     onSuccess: () => {
+      showToast('Customer created successfully', 'success')
       onSuccess()
     },
     onError: (err) => {
@@ -39,12 +39,10 @@ export function CreateCustomerDialog({ connectionId, platformType, customer, onC
 
   const updateMutation = useMutation({
     mutationFn: (data: { first_name: string; last_name: string; email: string; organization?: string; reference?: string }) => {
-      if (platformType === 'stripe') {
-        return updateStripeCustomer(connectionId, String(customer!.id), data)
-      }
-      return api.updateMaxioCustomer(connectionId, String(customer!.id), data)
+      return api.updateMaxioCustomer(connectionId, customer!.id, data)
     },
     onSuccess: () => {
+      showToast('Customer updated successfully', 'success')
       onSuccess()
     },
     onError: (err) => {
@@ -53,6 +51,12 @@ export function CreateCustomerDialog({ connectionId, platformType, customer, onC
   })
 
   const mutation = isEditMode ? updateMutation : createMutation
+
+  // Email regex validation
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,13 +71,13 @@ export function CreateCustomerDialog({ connectionId, platformType, customer, onC
       return
     }
 
-    if (!email.trim()) {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
       showToast('Email is required', 'error')
       return
     }
 
-    // Basic email validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(trimmedEmail)) {
       showToast('Please enter a valid email address', 'error')
       return
     }
@@ -91,7 +95,7 @@ export function CreateCustomerDialog({ connectionId, platformType, customer, onC
     <div className="modal-overlay">
       <div className="modal-dialog">
         <div className="modal-header">
-          {isEditMode ? 'Edit Customer' : 'Create Customer'}
+          {isEditMode ? 'Edit Maxio Customer' : 'Create Maxio Customer'}
           <button className="modal-close" onClick={onClose}>
             &times;
           </button>
@@ -127,7 +131,7 @@ export function CreateCustomerDialog({ connectionId, platformType, customer, onC
                 className="form-input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="john.doe@example.com"
+                placeholder="john@example.com"
               />
             </div>
 
@@ -151,9 +155,7 @@ export function CreateCustomerDialog({ connectionId, platformType, customer, onC
                 onChange={(e) => setReference(e.target.value)}
                 placeholder="Your internal customer ID"
               />
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Optional unique identifier from your system
-              </div>
+              <div className="form-hint">Optional unique identifier from your system</div>
             </div>
           </div>
           <div className="modal-footer">

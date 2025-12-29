@@ -450,11 +450,7 @@ func (s *Server) handleStripeCreateSubscription(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var input struct {
-		CustomerID      string `json:"customer_id"`
-		PriceID         string `json:"price_id"`
-		PaymentBehavior string `json:"payment_behavior,omitempty"`
-	}
+	var input stripe.SubscriptionInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid request body")
 		return
@@ -470,11 +466,197 @@ func (s *Server) handleStripeCreateSubscription(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	subscription, err := client.CreateSubscription(input.CustomerID, input.PriceID, input.PaymentBehavior)
+	// Validate collection_method
+	if input.CollectionMethod != "" && input.CollectionMethod != "charge_automatically" && input.CollectionMethod != "send_invoice" {
+		respondError(w, http.StatusBadRequest, "collection_method must be 'charge_automatically' or 'send_invoice'")
+		return
+	}
+
+	// days_until_due required for send_invoice
+	if input.CollectionMethod == "send_invoice" && input.DaysUntilDue <= 0 {
+		input.DaysUntilDue = 30 // Default to 30 days
+	}
+
+	subscription, err := client.CreateSubscription(input)
 	if err != nil {
 		respondStripeAPIError(w, err)
 		return
 	}
 
 	respondJSON(w, http.StatusCreated, subscription)
+}
+
+// Coupon handlers
+
+func (s *Server) handleStripeListCoupons(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	startingAfter := r.URL.Query().Get("starting_after")
+
+	result, err := client.ListCoupons(limit, startingAfter)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result.Data)
+}
+
+func (s *Server) handleStripeGetCoupon(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	couponID := r.PathValue("couponId")
+	if couponID == "" {
+		respondError(w, http.StatusBadRequest, "Coupon ID is required")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	coupon, err := client.GetCoupon(couponID)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, coupon)
+}
+
+func (s *Server) handleStripeCreateCoupon(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var input stripe.CouponInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate duration
+	if input.Duration == "" {
+		respondError(w, http.StatusBadRequest, "duration is required (once, repeating, or forever)")
+		return
+	}
+	if input.Duration != "once" && input.Duration != "repeating" && input.Duration != "forever" {
+		respondError(w, http.StatusBadRequest, "duration must be 'once', 'repeating', or 'forever'")
+		return
+	}
+
+	// Validate duration_in_months for repeating
+	if input.Duration == "repeating" && input.DurationInMonths <= 0 {
+		respondError(w, http.StatusBadRequest, "duration_in_months is required when duration is 'repeating'")
+		return
+	}
+
+	// Validate discount (must have percent_off OR amount_off)
+	if input.PercentOff <= 0 && input.AmountOff <= 0 {
+		respondError(w, http.StatusBadRequest, "either percent_off or amount_off is required")
+		return
+	}
+
+	// Validate percent_off range
+	if input.PercentOff > 100 {
+		respondError(w, http.StatusBadRequest, "percent_off cannot exceed 100")
+		return
+	}
+
+	coupon, err := client.CreateCoupon(input)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, coupon)
+}
+
+func (s *Server) handleStripeUpdateCoupon(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	couponID := r.PathValue("couponId")
+	if couponID == "" {
+		respondError(w, http.StatusBadRequest, "Coupon ID is required")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var input struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	coupon, err := client.UpdateCoupon(couponID, input.Name)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, coupon)
+}
+
+func (s *Server) handleStripeDeleteCoupon(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	couponID := r.PathValue("couponId")
+	if couponID == "" {
+		respondError(w, http.StatusBadRequest, "Coupon ID is required")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	err = client.DeleteCoupon(couponID)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]bool{"deleted": true})
 }
