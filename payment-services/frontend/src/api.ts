@@ -273,6 +273,20 @@ export const listZuoraInvoices = async (connectionId: number): Promise<Invoice[]
   return response.data || []
 }
 
+export interface ZuoraPayment {
+  id: string
+  transaction_id?: string
+  amount_in_cents: number
+  status?: string
+  payment_date?: string
+  created_at?: string
+}
+
+export const listZuoraPayments = async (connectionId: number): Promise<ZuoraPayment[]> => {
+  const response = await api.get(`/api/zuora/${connectionId}/payments`)
+  return response.data || []
+}
+
 // Stripe APIs
 export const listStripeCustomers = async (connectionId: number): Promise<Customer[]> => {
   const response = await api.get(`/api/stripe/${connectionId}/customers`)
@@ -492,6 +506,120 @@ export const deleteStripeCoupon = async (connectionId: number, couponId: string)
   await api.delete(`/api/stripe/${connectionId}/coupons/${couponId}`)
 }
 
+// Stripe Payments (Charges)
+export interface StripePayment {
+  id: string
+  amount: number
+  currency: string
+  status: string
+  customer?: string
+  description?: string
+  created: number
+  receipt_url?: string
+}
+
+export const listStripePayments = async (connectionId: number): Promise<StripePayment[]> => {
+  const response = await api.get(`/api/stripe/${connectionId}/payments`)
+  return response.data || []
+}
+
+// Stripe Price operations
+// Note: Stripe prices are immutable - they can only be archived (deactivated), not deleted
+export interface StripePrice {
+  id: string
+  product: string
+  active: boolean
+  unit_amount: number
+  currency: string
+  nickname?: string
+  recurring?: {
+    interval: string
+    interval_count: number
+  }
+  created: number
+}
+
+export const getStripePrice = async (connectionId: number, priceId: string): Promise<StripePrice> => {
+  const response = await api.get(`/api/stripe/${connectionId}/prices/${priceId}`)
+  return response.data
+}
+
+export const archiveStripePrice = async (connectionId: number, priceId: string): Promise<StripePrice> => {
+  const response = await api.post(`/api/stripe/${connectionId}/prices/${priceId}/archive`)
+  return response.data
+}
+
+// Stripe Subscription update operations
+export interface StripeSubscriptionUpdateRequest {
+  cancel_at_period_end?: boolean
+  collection_method?: 'charge_automatically' | 'send_invoice'
+  days_until_due?: number
+  default_payment_method?: string
+  description?: string
+  coupon?: string
+  proration_behavior?: 'create_prorations' | 'none' | 'always_invoice'
+}
+
+// Extended Stripe Subscription type with more details
+export interface StripeSubscription {
+  id: string
+  customer: string
+  status: string
+  currency?: string
+  current_period_start: number
+  current_period_end: number
+  cancel_at_period_end: boolean
+  canceled_at?: number
+  created: number
+  start_date: number
+  ended_at?: number
+  trial_start?: number
+  trial_end?: number
+  items?: {
+    data: Array<{
+      id: string
+      price?: {
+        id: string
+        product: string
+        unit_amount: number
+        currency: string
+        recurring?: {
+          interval: string
+          interval_count: number
+        }
+      }
+      quantity: number
+    }>
+  }
+  latest_invoice?: string
+  default_payment_method?: string
+}
+
+export const getStripeSubscription = async (connectionId: number, subscriptionId: string): Promise<StripeSubscription> => {
+  const response = await api.get(`/api/stripe/${connectionId}/subscriptions/${subscriptionId}`)
+  return response.data
+}
+
+export const updateStripeSubscription = async (
+  connectionId: number,
+  subscriptionId: string,
+  req: StripeSubscriptionUpdateRequest
+): Promise<StripeSubscription> => {
+  const response = await api.put(`/api/stripe/${connectionId}/subscriptions/${subscriptionId}`, req)
+  return response.data
+}
+
+export const cancelStripeSubscription = async (
+  connectionId: number,
+  subscriptionId: string,
+  cancelAtPeriodEnd: boolean = false
+): Promise<StripeSubscription> => {
+  const response = await api.delete(`/api/stripe/${connectionId}/subscriptions/${subscriptionId}`, {
+    data: { cancel_at_period_end: cancelAtPeriodEnd }
+  })
+  return response.data
+}
+
 export default {
   listConnections,
   createConnection,
@@ -522,6 +650,7 @@ export default {
   listZuoraProductCatalogs,
   listZuoraProductsByRatePlan,
   listZuoraInvoices,
+  listZuoraPayments,
   // Stripe
   listStripeCustomers,
   createStripeCustomer,
@@ -536,4 +665,10 @@ export default {
   createStripeCoupon,
   updateStripeCoupon,
   deleteStripeCoupon,
+  listStripePayments,
+  getStripePrice,
+  archiveStripePrice,
+  getStripeSubscription,
+  updateStripeSubscription,
+  cancelStripeSubscription,
 }

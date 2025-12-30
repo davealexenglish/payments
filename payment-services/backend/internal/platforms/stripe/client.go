@@ -788,3 +788,152 @@ func (c *Client) DeleteCoupon(id string) error {
 
 	return nil
 }
+
+// UpdatePrice updates a price (only active, nickname, metadata can be updated)
+// Setting active=false effectively archives the price
+func (c *Client) UpdatePrice(id string, active bool, nickname string) (*Price, error) {
+	formData := url.Values{}
+	if active {
+		formData.Set("active", "true")
+	} else {
+		formData.Set("active", "false")
+	}
+	if nickname != "" {
+		formData.Set("nickname", nickname)
+	}
+
+	path := "/prices/" + id
+	resp, err := c.doRequest("POST", path, formData)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var price Price
+	if err := json.NewDecoder(resp.Body).Decode(&price); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &price, nil
+}
+
+// ArchivePrice sets a price's active status to false
+func (c *Client) ArchivePrice(id string) (*Price, error) {
+	return c.UpdatePrice(id, false, "")
+}
+
+// GetPrice returns a single price by ID
+func (c *Client) GetPrice(id string) (*Price, error) {
+	path := "/prices/" + id
+	resp, err := c.doRequest("GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, NewAPIError(404, "price not found")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var price Price
+	if err := json.NewDecoder(resp.Body).Decode(&price); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &price, nil
+}
+
+// UpdateSubscription updates an existing subscription
+func (c *Client) UpdateSubscription(id string, input SubscriptionUpdateInput) (*Subscription, error) {
+	formData := url.Values{}
+
+	if input.CancelAtPeriodEnd != nil {
+		if *input.CancelAtPeriodEnd {
+			formData.Set("cancel_at_period_end", "true")
+		} else {
+			formData.Set("cancel_at_period_end", "false")
+		}
+	}
+
+	if input.CollectionMethod != "" {
+		formData.Set("collection_method", input.CollectionMethod)
+	}
+
+	if input.DaysUntilDue > 0 {
+		formData.Set("days_until_due", fmt.Sprintf("%d", input.DaysUntilDue))
+	}
+
+	if input.DefaultPaymentMethod != "" {
+		formData.Set("default_payment_method", input.DefaultPaymentMethod)
+	}
+
+	if input.Description != "" {
+		formData.Set("description", input.Description)
+	}
+
+	if input.Coupon != "" {
+		formData.Set("coupon", input.Coupon)
+	}
+
+	if input.ProrationBehavior != "" {
+		formData.Set("proration_behavior", input.ProrationBehavior)
+	}
+
+	for k, v := range input.Metadata {
+		formData.Set("metadata["+k+"]", v)
+	}
+
+	path := "/subscriptions/" + id
+	resp, err := c.doRequest("POST", path, formData)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var subscription Subscription
+	if err := json.NewDecoder(resp.Body).Decode(&subscription); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &subscription, nil
+}
+
+// CancelSubscription cancels a subscription immediately or at period end
+func (c *Client) CancelSubscription(id string, cancelAtPeriodEnd bool) (*Subscription, error) {
+	if cancelAtPeriodEnd {
+		// Update to cancel at period end
+		input := SubscriptionUpdateInput{CancelAtPeriodEnd: &cancelAtPeriodEnd}
+		return c.UpdateSubscription(id, input)
+	}
+
+	// Cancel immediately
+	path := "/subscriptions/" + id
+	resp, err := c.doRequest("DELETE", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var subscription Subscription
+	if err := json.NewDecoder(resp.Body).Decode(&subscription); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &subscription, nil
+}

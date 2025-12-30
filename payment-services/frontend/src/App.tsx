@@ -4,6 +4,8 @@ import { TreeView } from './components/TreeView'
 import { PropertiesPanel } from './components/PropertiesPanel'
 import { Toolbar } from './components/Toolbar'
 import { ToastProvider } from './components/Toast'
+import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
+import { AlertProvider, useAlert } from './components/AlertDialog'
 // Stripe dialogs
 import {
   CreateStripeCustomerDialog,
@@ -12,7 +14,10 @@ import {
   CreateStripeSubscriptionDialog,
   CreateStripeCouponDialog,
   StripeConnectionDialog,
+  EditStripeCustomerDialog,
+  EditStripeSubscriptionDialog,
 } from './components/dialogs/stripe'
+import { EditStripeCouponDialog } from './components/dialogs/stripe/EditStripeCouponDialog'
 // Maxio dialogs
 import {
   CreateMaxioCustomerDialog,
@@ -23,7 +28,7 @@ import {
 } from './components/dialogs/maxio'
 // Zuora dialogs
 import { ZuoraConnectionDialog } from './components/dialogs/zuora'
-import type { ProductFamily, Customer, Product } from './api'
+import type { ProductFamily, Customer, Product, StripeCoupon } from './api'
 import type { ConnectionData } from './components/nodes/types'
 import './App.css'
 
@@ -72,6 +77,19 @@ interface CouponDialogState {
   connectionId: number | null
 }
 
+interface EditCouponDialogState {
+  show: boolean
+  connectionId: number | null
+  coupon: StripeCoupon | null
+}
+
+interface EditSubscriptionDialogState {
+  show: boolean
+  connectionId: number | null
+  subscriptionId: string | null
+  platformType: string | null
+}
+
 interface ConnectionDialogState {
   show: boolean
   mode: 'create' | 'edit'
@@ -80,7 +98,9 @@ interface ConnectionDialogState {
   connectionData: ConnectionData | null
 }
 
-function App() {
+function AppContent() {
+  const confirm = useConfirm()
+  const alert = useAlert()
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
   const [treePanelWidth, setTreePanelWidth] = useState(300)
   const [connectionDialog, setConnectionDialog] = useState<ConnectionDialogState>({
@@ -116,6 +136,17 @@ function App() {
   const [couponDialog, setCouponDialog] = useState<CouponDialogState>({
     show: false,
     connectionId: null,
+  })
+  const [editCouponDialog, setEditCouponDialog] = useState<EditCouponDialogState>({
+    show: false,
+    connectionId: null,
+    coupon: null,
+  })
+  const [editSubscriptionDialog, setEditSubscriptionDialog] = useState<EditSubscriptionDialogState>({
+    show: false,
+    connectionId: null,
+    subscriptionId: null,
+    platformType: null,
   })
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -204,14 +235,61 @@ function App() {
   }, [])
 
   const handleDeleteCoupon = useCallback(async (connectionId: number, couponId: string) => {
-    if (!confirm(`Are you sure you want to delete coupon "${couponId}"?`)) return
+    const confirmed = await confirm({
+      title: 'Delete Coupon',
+      message: `Are you sure you want to delete coupon "${couponId}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!confirmed) return
     try {
       const { deleteStripeCoupon } = await import('./api')
       await deleteStripeCoupon(connectionId, couponId)
-      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', String(connectionId)] })
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', connectionId] })
     } catch (err) {
       console.error('Delete coupon failed:', err)
     }
+  }, [confirm])
+
+  const handleEditCoupon = useCallback((connectionId: number, coupon: StripeCoupon) => {
+    setEditCouponDialog({
+      show: true,
+      connectionId,
+      coupon,
+    })
+  }, [])
+
+  const handleArchivePrice = useCallback(async (connectionId: number, priceId: string) => {
+    const confirmed = await confirm({
+      title: 'Archive Price',
+      message: 'Are you sure you want to archive this price? It will no longer be available for new subscriptions.',
+      confirmLabel: 'Archive',
+      danger: true,
+    })
+    if (!confirmed) return
+    try {
+      const { archiveStripePrice } = await import('./api')
+      await archiveStripePrice(connectionId, priceId)
+      // Refresh the products tree to show the price is archived
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'products'] })
+      queryClient.invalidateQueries({ queryKey: ['stripe', `products-`] })
+    } catch (err) {
+      console.error('Archive price failed:', err)
+      await alert({
+        title: 'Archive Failed',
+        message: 'Failed to archive price. It may be in use by active subscriptions.',
+        type: 'error',
+      })
+    }
+  }, [confirm, alert])
+
+  const handleEditSubscription = useCallback((connectionId: number, subscriptionId: string, platformType?: string) => {
+    setEditSubscriptionDialog({
+      show: true,
+      connectionId,
+      subscriptionId,
+      platformType: platformType || null,
+    })
   }, [])
 
   const handleAddConnection = useCallback((platformType: 'maxio' | 'stripe' | 'zuora') => {
@@ -269,24 +347,54 @@ function App() {
     setCouponDialog({ show: false, connectionId: null })
   }, [])
 
+  const closeEditCouponDialog = useCallback(() => {
+    setEditCouponDialog({ show: false, connectionId: null, coupon: null })
+  }, [])
+
+  const closeEditSubscriptionDialog = useCallback(() => {
+    setEditSubscriptionDialog({ show: false, connectionId: null, subscriptionId: null, platformType: null })
+  }, [])
+
   // Render vendor-specific customer dialog
   const renderCustomerDialog = () => {
     if (!customerDialog.show || !customerDialog.connectionId) return null
 
     const { connectionId, platformType, customer } = customerDialog
-    const onSuccess = () => {
+    const onCreateSuccess = () => {
       closeCustomerDialog()
       queryClient.invalidateQueries({ queryKey: [platformType, 'customers'] })
+    }
+    const onEditSuccess = (updatedCustomer: Customer) => {
+      closeCustomerDialog()
+      queryClient.invalidateQueries({ queryKey: [platformType, 'customers'] })
+      // Update the selected node with the new customer data
+      if (selectedNode && selectedNode.type === 'customer') {
+        setSelectedNode({
+          ...selectedNode,
+          name: updatedCustomer.email || `${updatedCustomer.first_name} ${updatedCustomer.last_name}`.trim() || selectedNode.name,
+          data: updatedCustomer,
+        })
+      }
     }
 
     switch (platformType) {
       case 'stripe':
-        // Note: Stripe doesn't have an edit mode in our current implementation
+        // Use edit dialog if customer is provided, otherwise create dialog
+        if (customer) {
+          return (
+            <EditStripeCustomerDialog
+              connectionId={connectionId}
+              customer={customer}
+              onClose={closeCustomerDialog}
+              onSuccess={onEditSuccess}
+            />
+          )
+        }
         return (
           <CreateStripeCustomerDialog
             connectionId={connectionId}
             onClose={closeCustomerDialog}
-            onSuccess={onSuccess}
+            onSuccess={onCreateSuccess}
           />
         )
       case 'maxio':
@@ -295,7 +403,7 @@ function App() {
             connectionId={connectionId}
             customer={customer}
             onClose={closeCustomerDialog}
-            onSuccess={onSuccess}
+            onSuccess={onCreateSuccess}
           />
         )
       default:
@@ -313,12 +421,17 @@ function App() {
       queryClient.invalidateQueries({ queryKey: [platformType, 'subscriptions'] })
     }
 
+    // Get customer label from selected node if this is a customer subscription
+    const customerData = selectedNode?.type === 'customer' ? selectedNode.data as Customer | undefined : undefined
+    const customerLabel = customerData?.email || (customerData ? `${customerData.first_name || ''} ${customerData.last_name || ''}`.trim() : undefined) || undefined
+
     switch (platformType) {
       case 'stripe':
         return (
           <CreateStripeSubscriptionDialog
             connectionId={connectionId}
             customerId={customerId}
+            customerLabel={customerLabel}
             onClose={closeSubscriptionDialog}
             onSuccess={onSuccess}
           />
@@ -418,7 +531,7 @@ function App() {
     const { connectionId } = couponDialog
     const onSuccess = () => {
       closeCouponDialog()
-      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', String(connectionId)] })
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', connectionId] })
     }
 
     return (
@@ -428,6 +541,51 @@ function App() {
         onSuccess={onSuccess}
       />
     )
+  }
+
+  // Render edit coupon dialog (Stripe only)
+  const renderEditCouponDialog = () => {
+    if (!editCouponDialog.show || !editCouponDialog.connectionId || !editCouponDialog.coupon) return null
+
+    const { connectionId, coupon } = editCouponDialog
+    const onSuccess = () => {
+      closeEditCouponDialog()
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', connectionId] })
+    }
+
+    return (
+      <EditStripeCouponDialog
+        connectionId={connectionId}
+        coupon={coupon}
+        onClose={closeEditCouponDialog}
+        onSuccess={onSuccess}
+      />
+    )
+  }
+
+  // Render edit subscription dialog (Stripe only)
+  const renderEditSubscriptionDialog = () => {
+    if (!editSubscriptionDialog.show || !editSubscriptionDialog.connectionId || !editSubscriptionDialog.subscriptionId) return null
+
+    const { connectionId, subscriptionId, platformType } = editSubscriptionDialog
+    const onSuccess = () => {
+      closeEditSubscriptionDialog()
+      queryClient.invalidateQueries({ queryKey: [platformType, 'subscriptions', connectionId] })
+    }
+
+    // Currently only Stripe is supported
+    if (platformType === 'stripe') {
+      return (
+        <EditStripeSubscriptionDialog
+          connectionId={connectionId}
+          subscriptionId={subscriptionId}
+          onClose={closeEditSubscriptionDialog}
+          onSuccess={onSuccess}
+        />
+      )
+    }
+
+    return null
   }
 
   // Render vendor-specific connection dialog
@@ -489,64 +647,79 @@ function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-      <div
-        className="app"
-        ref={containerRef}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        <Toolbar onRefresh={handleRefreshTree} />
-        <div className="main-layout">
-          {/* Left: Tree Panel */}
-          <div className="panel tree-panel" style={{ width: treePanelWidth }}>
-            <div className="panel-header">Payment Platforms</div>
-            <div className="panel-content">
-              <TreeView
-                onSelectNode={setSelectedNode}
-                onCreateCustomer={handleCreateCustomer}
-                onCreateSubscription={handleCreateSubscription}
-                onCreateProductFamily={handleCreateProductFamily}
-                onCreateProduct={handleCreateProduct}
-                onEditCustomer={handleEditCustomer}
-                onEditProduct={handleEditProduct}
-                onCreateCoupon={handleCreateCoupon}
-                onDeleteCoupon={handleDeleteCoupon}
-                onAddConnection={handleAddConnection}
-                onEditConnection={handleEditConnection}
-              />
-            </div>
-          </div>
-
-          {/* Resizer */}
-          <div
-            className="resizer resizer-vertical"
-            onMouseDown={() => handleMouseDown('left')}
-          />
-
-          {/* Right: Properties Panel */}
-          <div className="panel properties-panel">
-            <div className="panel-header">
-              {selectedNode ? `${selectedNode.name}` : 'Select an item'}
-            </div>
-            <div className="panel-content">
-              <PropertiesPanel selectedNode={selectedNode} />
-            </div>
+    <div
+      className="app"
+      ref={containerRef}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
+      <Toolbar onRefresh={handleRefreshTree} />
+      <div className="main-layout">
+        {/* Left: Tree Panel */}
+        <div className="panel tree-panel" style={{ width: treePanelWidth }}>
+          <div className="panel-header">Payment Platforms</div>
+          <div className="panel-content">
+            <TreeView
+              onSelectNode={setSelectedNode}
+              onCreateCustomer={handleCreateCustomer}
+              onCreateSubscription={handleCreateSubscription}
+              onCreateProductFamily={handleCreateProductFamily}
+              onCreateProduct={handleCreateProduct}
+              onEditCustomer={handleEditCustomer}
+              onEditProduct={handleEditProduct}
+              onCreateCoupon={handleCreateCoupon}
+              onEditCoupon={handleEditCoupon}
+              onDeleteCoupon={handleDeleteCoupon}
+              onArchivePrice={handleArchivePrice}
+              onEditSubscription={handleEditSubscription}
+              onAddConnection={handleAddConnection}
+              onEditConnection={handleEditConnection}
+            />
           </div>
         </div>
 
-        {/* Connection dialogs */}
-        {renderConnectionDialog()}
+        {/* Resizer */}
+        <div
+          className="resizer resizer-vertical"
+          onMouseDown={() => handleMouseDown('left')}
+        />
 
-        {/* Vendor-specific dialogs */}
-        {renderCustomerDialog()}
-        {renderSubscriptionDialog()}
-        {renderProductFamilyDialog()}
-        {renderProductDialog()}
-        {renderCouponDialog()}
+        {/* Right: Properties Panel */}
+        <div className="panel properties-panel">
+          <div className="panel-header">
+            {selectedNode ? `${selectedNode.name}` : 'Select an item'}
+          </div>
+          <div className="panel-content">
+            <PropertiesPanel selectedNode={selectedNode} />
+          </div>
+        </div>
       </div>
+
+      {/* Connection dialogs */}
+      {renderConnectionDialog()}
+
+      {/* Vendor-specific dialogs */}
+      {renderCustomerDialog()}
+      {renderSubscriptionDialog()}
+      {renderProductFamilyDialog()}
+      {renderProductDialog()}
+      {renderCouponDialog()}
+      {renderEditCouponDialog()}
+      {renderEditSubscriptionDialog()}
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <ConfirmProvider>
+          <AlertProvider>
+            <AppContent />
+          </AlertProvider>
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   )

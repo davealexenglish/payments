@@ -38,16 +38,22 @@ export const CustomerNode = createLeafNodeHandler({
 
     if (connectionId && node.data) {
       const customer = node.data as Customer
-      items.push({
-        label: 'Edit Customer',
-        icon: <Pencil size={14} />,
-        action: () => editCustomer(connectionId, customer, platformType),
-      })
-      items.push({
-        label: 'Create Subscription',
-        icon: <Plus size={14} />,
-        action: () => createSubscription(connectionId, customer.id, platformType),
-      })
+      // Edit Customer is only available for Stripe and Maxio (Zuora not supported yet)
+      if (platformType === 'stripe' || platformType === 'maxio') {
+        items.push({
+          label: 'Edit Customer',
+          icon: <Pencil size={14} />,
+          action: () => editCustomer(connectionId, customer, platformType),
+        })
+      }
+      // Create Subscription is only available for Stripe and Maxio (Zuora not supported yet)
+      if (platformType === 'stripe' || platformType === 'maxio') {
+        items.push({
+          label: 'Create Subscription',
+          icon: <Plus size={14} />,
+          action: () => createSubscription(connectionId, customer.id, platformType),
+        })
+      }
     }
 
     return items

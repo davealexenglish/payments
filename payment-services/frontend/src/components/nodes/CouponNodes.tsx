@@ -1,4 +1,4 @@
-import { Tag, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Tag, Plus, RefreshCw, Trash2, Pencil } from 'lucide-react'
 import { createContainerNodeHandler, createLeafNodeHandler } from './BaseNode'
 import type { MenuItem, NodeContext, TreeNodeData } from './types'
 import type { StripeCoupon } from '../../api'
@@ -51,16 +51,27 @@ export const CouponNode = createLeafNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { node, connectionId, platformType, onDeleteCoupon } = context
+    const { node, connectionId, platformType, onEditCoupon, onDeleteCoupon } = context
 
-    if (connectionId && platformType === 'stripe' && onDeleteCoupon && node.data) {
+    if (connectionId && platformType === 'stripe' && node.data) {
       const coupon = node.data as StripeCoupon
-      items.push({
-        label: 'Delete Coupon',
-        icon: <Trash2 size={14} />,
-        action: () => onDeleteCoupon(connectionId, coupon.id),
-        danger: true,
-      })
+
+      if (onEditCoupon) {
+        items.push({
+          label: 'Edit Coupon',
+          icon: <Pencil size={14} />,
+          action: () => onEditCoupon(connectionId, coupon),
+        })
+      }
+
+      if (onDeleteCoupon) {
+        items.push({
+          label: 'Delete Coupon',
+          icon: <Trash2 size={14} />,
+          action: () => onDeleteCoupon(connectionId, coupon.id),
+          danger: true,
+        })
+      }
     }
 
     return items
