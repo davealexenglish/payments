@@ -13,6 +13,7 @@ import {
   CreateStripeCouponDialog,
   StripeConnectionDialog,
 } from './components/dialogs/stripe'
+import { EditStripeCouponDialog } from './components/dialogs/stripe/EditStripeCouponDialog'
 // Maxio dialogs
 import {
   CreateMaxioCustomerDialog,
@@ -23,7 +24,7 @@ import {
 } from './components/dialogs/maxio'
 // Zuora dialogs
 import { ZuoraConnectionDialog } from './components/dialogs/zuora'
-import type { ProductFamily, Customer, Product } from './api'
+import type { ProductFamily, Customer, Product, StripeCoupon } from './api'
 import type { ConnectionData } from './components/nodes/types'
 import './App.css'
 
@@ -72,6 +73,12 @@ interface CouponDialogState {
   connectionId: number | null
 }
 
+interface EditCouponDialogState {
+  show: boolean
+  connectionId: number | null
+  coupon: StripeCoupon | null
+}
+
 interface ConnectionDialogState {
   show: boolean
   mode: 'create' | 'edit'
@@ -116,6 +123,11 @@ function App() {
   const [couponDialog, setCouponDialog] = useState<CouponDialogState>({
     show: false,
     connectionId: null,
+  })
+  const [editCouponDialog, setEditCouponDialog] = useState<EditCouponDialogState>({
+    show: false,
+    connectionId: null,
+    coupon: null,
   })
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -208,10 +220,18 @@ function App() {
     try {
       const { deleteStripeCoupon } = await import('./api')
       await deleteStripeCoupon(connectionId, couponId)
-      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', String(connectionId)] })
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', connectionId] })
     } catch (err) {
       console.error('Delete coupon failed:', err)
     }
+  }, [])
+
+  const handleEditCoupon = useCallback((connectionId: number, coupon: StripeCoupon) => {
+    setEditCouponDialog({
+      show: true,
+      connectionId,
+      coupon,
+    })
   }, [])
 
   const handleAddConnection = useCallback((platformType: 'maxio' | 'stripe' | 'zuora') => {
@@ -267,6 +287,10 @@ function App() {
 
   const closeCouponDialog = useCallback(() => {
     setCouponDialog({ show: false, connectionId: null })
+  }, [])
+
+  const closeEditCouponDialog = useCallback(() => {
+    setEditCouponDialog({ show: false, connectionId: null, coupon: null })
   }, [])
 
   // Render vendor-specific customer dialog
@@ -418,13 +442,33 @@ function App() {
     const { connectionId } = couponDialog
     const onSuccess = () => {
       closeCouponDialog()
-      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', String(connectionId)] })
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', connectionId] })
     }
 
     return (
       <CreateStripeCouponDialog
         connectionId={connectionId}
         onClose={closeCouponDialog}
+        onSuccess={onSuccess}
+      />
+    )
+  }
+
+  // Render edit coupon dialog (Stripe only)
+  const renderEditCouponDialog = () => {
+    if (!editCouponDialog.show || !editCouponDialog.connectionId || !editCouponDialog.coupon) return null
+
+    const { connectionId, coupon } = editCouponDialog
+    const onSuccess = () => {
+      closeEditCouponDialog()
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'coupons', connectionId] })
+    }
+
+    return (
+      <EditStripeCouponDialog
+        connectionId={connectionId}
+        coupon={coupon}
+        onClose={closeEditCouponDialog}
         onSuccess={onSuccess}
       />
     )
@@ -513,6 +557,7 @@ function App() {
                 onEditCustomer={handleEditCustomer}
                 onEditProduct={handleEditProduct}
                 onCreateCoupon={handleCreateCoupon}
+                onEditCoupon={handleEditCoupon}
                 onDeleteCoupon={handleDeleteCoupon}
                 onAddConnection={handleAddConnection}
                 onEditConnection={handleEditConnection}
@@ -546,6 +591,7 @@ function App() {
         {renderProductFamilyDialog()}
         {renderProductDialog()}
         {renderCouponDialog()}
+        {renderEditCouponDialog()}
       </div>
       </ToastProvider>
     </QueryClientProvider>

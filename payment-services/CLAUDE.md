@@ -218,4 +218,4 @@ kubectl port-forward -n billing-hub svc/frontend 8081:80
 
 ### Current Deployed Versions
 - Backend: `0.1.22`
-- Frontend: `0.1.27`
+- Frontend: `0.1.29`

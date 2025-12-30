@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, ChevronDown } from 'lucide-react'
-import api, { type TreeNode, type Customer, type Subscription, type Product, type Invoice, type ProductFamily, type StripeCoupon } from '../api'
+import api, { type TreeNode, type Customer, type Subscription, type Product, type Invoice, type ProductFamily, type StripeCoupon, type StripePayment, type ZuoraPayment } from '../api'
 import type { SelectedNode } from '../App'
 import { getNodeHandler, type TreeNodeData, type NodeContext, type MenuItem, type ConnectionData } from './nodes'
 
@@ -14,6 +14,7 @@ interface TreeViewProps {
   onEditCustomer: (connectionId: number, customer: Customer, platformType?: string) => void
   onEditProduct: (connectionId: number, product: Product, platformType?: string) => void
   onCreateCoupon?: (connectionId: number) => void
+  onEditCoupon?: (connectionId: number, coupon: StripeCoupon) => void
   onDeleteCoupon?: (connectionId: number, couponId: string) => void
   onAddConnection: (platformType: 'maxio' | 'stripe' | 'zuora') => void
   onEditConnection: (connectionId: number, platformType: string, connectionData: ConnectionData) => void
@@ -27,7 +28,7 @@ interface ContextMenuState {
 
 const ICON_SIZE = 14
 
-export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onDeleteCoupon, onAddConnection, onEditConnection }: TreeViewProps) {
+export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onEditCoupon, onDeleteCoupon, onAddConnection, onEditConnection }: TreeViewProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -101,6 +102,7 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
       editCustomer: onEditCustomer,
       editProduct: onEditProduct,
       onCreateCoupon,
+      onEditCoupon,
       onDeleteCoupon,
       addConnection: onAddConnection,
       editConnection: onEditConnection,
@@ -112,7 +114,7 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
     if (items.length > 0) {
       setContextMenu({ x: e.clientX, y: e.clientY, items })
     }
-  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onDeleteCoupon, onAddConnection, onEditConnection])
+  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onEditCoupon, onDeleteCoupon, onAddConnection, onEditConnection])
 
   const handleTestConnection = useCallback(
     async (connectionId: number) => {
@@ -268,7 +270,7 @@ interface LazyEntityListProps {
   onToggleNode: (nodeId: string) => void
 }
 
-type EntityItem = Customer | Subscription | Product | Invoice | ProductFamily | StripeCoupon
+type EntityItem = Customer | Subscription | Product | Invoice | ProductFamily | StripeCoupon | StripePayment | ZuoraPayment
 
 function LazyEntityList({
   type,
@@ -305,6 +307,8 @@ function LazyEntityList({
           return api.listZuoraProductCatalogs(connectionId)
         case 'invoices':
           return api.listZuoraInvoices(connectionId)
+        case 'payments':
+          return api.listZuoraPayments(connectionId)
         default:
           return []
       }
@@ -318,6 +322,8 @@ function LazyEntityList({
           return api.listStripeProducts(connectionId)
         case 'invoices':
           return api.listStripeInvoices(connectionId)
+        case 'payments':
+          return api.listStripePayments(connectionId)
         case 'coupons':
           return api.listStripeCoupons(connectionId)
         default:

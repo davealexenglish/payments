@@ -273,6 +273,20 @@ export const listZuoraInvoices = async (connectionId: number): Promise<Invoice[]
   return response.data || []
 }
 
+export interface ZuoraPayment {
+  id: string
+  transaction_id?: string
+  amount_in_cents: number
+  status?: string
+  payment_date?: string
+  created_at?: string
+}
+
+export const listZuoraPayments = async (connectionId: number): Promise<ZuoraPayment[]> => {
+  const response = await api.get(`/api/zuora/${connectionId}/payments`)
+  return response.data || []
+}
+
 // Stripe APIs
 export const listStripeCustomers = async (connectionId: number): Promise<Customer[]> => {
   const response = await api.get(`/api/stripe/${connectionId}/customers`)
@@ -492,6 +506,23 @@ export const deleteStripeCoupon = async (connectionId: number, couponId: string)
   await api.delete(`/api/stripe/${connectionId}/coupons/${couponId}`)
 }
 
+// Stripe Payments (Charges)
+export interface StripePayment {
+  id: string
+  amount: number
+  currency: string
+  status: string
+  customer?: string
+  description?: string
+  created: number
+  receipt_url?: string
+}
+
+export const listStripePayments = async (connectionId: number): Promise<StripePayment[]> => {
+  const response = await api.get(`/api/stripe/${connectionId}/payments`)
+  return response.data || []
+}
+
 export default {
   listConnections,
   createConnection,
@@ -522,6 +553,7 @@ export default {
   listZuoraProductCatalogs,
   listZuoraProductsByRatePlan,
   listZuoraInvoices,
+  listZuoraPayments,
   // Stripe
   listStripeCustomers,
   createStripeCustomer,
@@ -536,4 +568,5 @@ export default {
   createStripeCoupon,
   updateStripeCoupon,
   deleteStripeCoupon,
+  listStripePayments,
 }

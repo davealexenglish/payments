@@ -1,7 +1,7 @@
 // Types for tree node handlers - payment billing hub version
 
 import type { ReactNode } from 'react'
-import type { ProductFamily, Customer, Product } from '../../api'
+import type { ProductFamily, Customer, Product, StripeCoupon } from '../../api'
 
 export interface TreeNodeData {
   id: string
@@ -55,6 +55,7 @@ export interface NodeContext {
   editProduct: (connectionId: number, product: Product, platformType?: string) => void
   // Coupon operations (Stripe only)
   onCreateCoupon?: (connectionId: number) => void
+  onEditCoupon?: (connectionId: number, coupon: StripeCoupon) => void
   onDeleteCoupon?: (connectionId: number, couponId: string) => void
   // Connection operations
   addConnection: (platformType: 'maxio' | 'stripe' | 'zuora') => void
