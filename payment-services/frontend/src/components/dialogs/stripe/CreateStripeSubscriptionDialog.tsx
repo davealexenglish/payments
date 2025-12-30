@@ -13,7 +13,8 @@ import { useToast } from '../../Toast'
 
 interface CreateStripeSubscriptionDialogProps {
   connectionId: number
-  customerId?: string  // Pre-selected customer
+  customerId?: string  // Pre-selected customer ID
+  customerLabel?: string // Display label for pre-selected customer (email or name)
   onClose: () => void
   onSuccess: () => void
 }
@@ -23,7 +24,7 @@ interface CreateStripeSubscriptionDialogProps {
  * Maps to: POST /v1/subscriptions
  * https://docs.stripe.com/api/subscriptions/create
  */
-export function CreateStripeSubscriptionDialog({ connectionId, customerId: preselectedCustomerId, onClose, onSuccess }: CreateStripeSubscriptionDialogProps) {
+export function CreateStripeSubscriptionDialog({ connectionId, customerId: preselectedCustomerId, customerLabel, onClose, onSuccess }: CreateStripeSubscriptionDialogProps) {
   // Required fields
   const [customerId, setCustomerId] = useState(preselectedCustomerId || '')
   const [priceId, setPriceId] = useState('')
@@ -184,7 +185,7 @@ export function CreateStripeSubscriptionDialog({ connectionId, customerId: prese
                 <label style={labelStyle}>Customer *</label>
                 <div style={inputContainerStyle}>
                   {preselectedCustomerId ? (
-                    <div className="form-static" style={{ fontSize: '13px', padding: '6px 0' }}>{preselectedCustomerId}</div>
+                    <div className="form-static" style={{ fontSize: '13px', padding: '6px 0' }}>{customerLabel || preselectedCustomerId}</div>
                   ) : (
                     <select
                       className="form-input"

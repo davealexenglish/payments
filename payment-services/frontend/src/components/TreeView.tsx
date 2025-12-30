@@ -4,6 +4,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react'
 import api, { type TreeNode, type Customer, type Subscription, type Product, type Invoice, type ProductFamily, type StripeCoupon, type StripePayment, type ZuoraPayment } from '../api'
 import type { SelectedNode } from '../App'
 import { getNodeHandler, type TreeNodeData, type NodeContext, type MenuItem, type ConnectionData } from './nodes'
+import { useConfirm } from './ConfirmDialog'
 
 interface TreeViewProps {
   onSelectNode: (node: SelectedNode) => void
@@ -16,6 +17,8 @@ interface TreeViewProps {
   onCreateCoupon?: (connectionId: number) => void
   onEditCoupon?: (connectionId: number, coupon: StripeCoupon) => void
   onDeleteCoupon?: (connectionId: number, couponId: string) => void
+  onArchivePrice?: (connectionId: number, priceId: string) => void
+  onEditSubscription?: (connectionId: number, subscriptionId: string, platformType?: string) => void
   onAddConnection: (platformType: 'maxio' | 'stripe' | 'zuora') => void
   onEditConnection: (connectionId: number, platformType: string, connectionData: ConnectionData) => void
 }
@@ -28,11 +31,12 @@ interface ContextMenuState {
 
 const ICON_SIZE = 14
 
-export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onEditCoupon, onDeleteCoupon, onAddConnection, onEditConnection }: TreeViewProps) {
+export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onEditCoupon, onDeleteCoupon, onArchivePrice, onEditSubscription, onAddConnection, onEditConnection }: TreeViewProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
 
   // Fetch tree structure
   const { data: tree, isLoading } = useQuery({
@@ -104,6 +108,8 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
       onCreateCoupon,
       onEditCoupon,
       onDeleteCoupon,
+      onArchivePrice,
+      editSubscription: onEditSubscription,
       addConnection: onAddConnection,
       editConnection: onEditConnection,
       testConnection: handleTestConnection,
@@ -114,7 +120,7 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
     if (items.length > 0) {
       setContextMenu({ x: e.clientX, y: e.clientY, items })
     }
-  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onEditCoupon, onDeleteCoupon, onAddConnection, onEditConnection])
+  }, [queryClient, toggleNode, onSelectNode, onCreateCustomer, onCreateSubscription, onCreateProductFamily, onCreateProduct, onEditCustomer, onEditProduct, onCreateCoupon, onEditCoupon, onDeleteCoupon, onArchivePrice, onEditSubscription, onAddConnection, onEditConnection])
 
   const handleTestConnection = useCallback(
     async (connectionId: number) => {
@@ -130,7 +136,13 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
 
   const handleDeleteConnection = useCallback(
     async (connectionId: number) => {
-      if (!confirm('Are you sure you want to delete this connection?')) return
+      const confirmed = await confirm({
+        title: 'Delete Connection',
+        message: 'Are you sure you want to delete this connection? This action cannot be undone.',
+        confirmLabel: 'Delete',
+        danger: true,
+      })
+      if (!confirmed) return
       try {
         await api.deleteConnection(connectionId)
         queryClient.invalidateQueries({ queryKey: ['tree'] })
@@ -138,7 +150,7 @@ export function TreeView({ onSelectNode, onCreateCustomer, onCreateSubscription,
         console.error('Delete connection failed:', err)
       }
     },
-    [queryClient]
+    [queryClient, confirm]
   )
 
   const renderContextMenu = () => {

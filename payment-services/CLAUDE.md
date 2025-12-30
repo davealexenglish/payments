@@ -62,6 +62,17 @@ Customer and Product dialogs support both create and edit modes:
 - Create mode: Pass `connectionId` only
 - Edit mode: Pass `connectionId` + existing entity (`customer` or `product` prop)
 
+### Platform Feature Support
+Not all platforms support the same operations. Context menu items are conditionally shown:
+
+| Feature | Stripe | Maxio | Zuora |
+|---------|--------|-------|-------|
+| Edit Customer | Yes | Yes | No (read-only) |
+| Create Subscription | Yes | Yes | No |
+| Edit Subscription | Yes | No | No |
+| Create/Edit Products | Yes | Yes | No |
+| Coupons | Yes | No | No |
+
 ### API Endpoints
 
 **Maxio** (`/api/maxio/{connectionId}/...`)
@@ -72,10 +83,10 @@ Customer and Product dialogs support both create and edit modes:
 - Invoices, Payments: GET list
 
 **Stripe** (`/api/stripe/{connectionId}/...`)
-- Customers: GET/POST list, GET individual
+- Customers: GET/POST/PUT list and individual
 - Products: GET/POST list, GET individual (maps to Product Families in frontend)
-- Prices: GET/POST list, GET individual (maps to Products in frontend)
-- Subscriptions: GET/POST list, GET individual
+- Prices: GET/POST/PUT list and individual, POST archive (maps to Products in frontend)
+- Subscriptions: GET/POST/PUT list and individual, POST cancel
 - Invoices, Payments: GET list
 - Coupons: GET/POST/PUT/DELETE list and individual (Stripe-only feature)
 
@@ -113,6 +124,8 @@ frontend/src/
 └── components/
     ├── TreeView.tsx             # Tree rendering, lazy loading, context menus
     ├── Toolbar.tsx              # Top toolbar (Add Connection, Help)
+    ├── ConfirmDialog.tsx        # Reusable confirm dialog (replaces window.confirm)
+    ├── AlertDialog.tsx          # Reusable alert dialog (replaces window.alert)
     ├── nodes/                   # Node type handlers (icons, context menus, display names)
     │   ├── index.ts             # Node registry mapping type → handler
     │   ├── VendorNodes.tsx      # vendor-maxio, vendor-stripe, vendor-zuora
@@ -123,7 +136,8 @@ frontend/src/
     │   └── ...                  # SubscriptionNodes, InvoiceNodes, PaymentNodes
     └── dialogs/                 # Modal dialogs for create/edit operations
         ├── maxio/               # Maxio-specific dialogs (Customer, Product, Subscription, etc.)
-        └── stripe/              # Stripe-specific dialogs (Customer, Product, Price, Subscription, Coupon)
+        ├── stripe/              # Stripe-specific dialogs (Customer, Product, Price, Subscription, Coupon)
+        └── zuora/               # Zuora-specific dialogs (Connection only - read-only platform)
 ```
 
 ## Reference Materials
@@ -217,5 +231,5 @@ kubectl port-forward -n billing-hub svc/frontend 8081:80
 ```
 
 ### Current Deployed Versions
-- Backend: `0.1.22`
-- Frontend: `0.1.29`
+- Backend: `0.1.24`
+- Frontend: `0.1.32`

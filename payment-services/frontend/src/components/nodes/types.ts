@@ -53,10 +53,13 @@ export interface NodeContext {
   // Dialog/action operations - Edit
   editCustomer: (connectionId: number, customer: Customer, platformType?: string) => void
   editProduct: (connectionId: number, product: Product, platformType?: string) => void
+  editSubscription?: (connectionId: number, subscriptionId: string, platformType?: string) => void
   // Coupon operations (Stripe only)
   onCreateCoupon?: (connectionId: number) => void
   onEditCoupon?: (connectionId: number, coupon: StripeCoupon) => void
   onDeleteCoupon?: (connectionId: number, couponId: string) => void
+  // Price operations (Stripe only - prices are immutable, can only be archived)
+  onArchivePrice?: (connectionId: number, priceId: string) => void
   // Connection operations
   addConnection: (platformType: 'maxio' | 'stripe' | 'zuora') => void
   editConnection: (connectionId: number, platformType: string, connectionData: ConnectionData) => void

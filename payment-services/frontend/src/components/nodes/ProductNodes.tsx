@@ -1,4 +1,4 @@
-import { FolderTree, Folder, Package, Plus, RefreshCw, Pencil } from 'lucide-react'
+import { FolderTree, Folder, Package, Plus, RefreshCw, Pencil, Archive } from 'lucide-react'
 import { createContainerNodeHandler, createExpandableEntityHandler, createLeafNodeHandler } from './BaseNode'
 import type { MenuItem, NodeContext, TreeNodeData } from './types'
 import type { ProductFamily, Product } from '../../api'
@@ -68,15 +68,28 @@ export const ProductNode = createLeafNodeHandler({
 
   getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
     const items: MenuItem[] = []
-    const { node, connectionId, platformType, editProduct } = context
+    const { node, connectionId, platformType, editProduct, onArchivePrice } = context
 
     if (connectionId && node.data) {
       const product = node.data as Product
-      items.push({
-        label: 'Edit Product',
-        icon: <Pencil size={14} />,
-        action: () => editProduct(connectionId, product, platformType),
-      })
+
+      if (platformType === 'stripe') {
+        // Stripe Prices are immutable - can only be archived (deactivated)
+        if (onArchivePrice) {
+          items.push({
+            label: 'Archive Price',
+            icon: <Archive size={14} />,
+            action: () => onArchivePrice(connectionId, product.id),
+          })
+        }
+      } else {
+        // Maxio and others - can edit products
+        items.push({
+          label: 'Edit Product',
+          icon: <Pencil size={14} />,
+          action: () => editProduct(connectionId, product, platformType),
+        })
+      }
     }
 
     return items

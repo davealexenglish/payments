@@ -660,3 +660,139 @@ func (s *Server) handleStripeDeleteCoupon(w http.ResponseWriter, r *http.Request
 
 	respondJSON(w, http.StatusOK, map[string]bool{"deleted": true})
 }
+
+// Price handlers
+
+func (s *Server) handleStripeGetPrice(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	priceID := r.PathValue("priceId")
+	if priceID == "" {
+		respondError(w, http.StatusBadRequest, "Price ID is required")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	price, err := client.GetPrice(priceID)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, price)
+}
+
+func (s *Server) handleStripeArchivePrice(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	priceID := r.PathValue("priceId")
+	if priceID == "" {
+		respondError(w, http.StatusBadRequest, "Price ID is required")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	price, err := client.ArchivePrice(priceID)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, price)
+}
+
+// Subscription update handlers
+
+func (s *Server) handleStripeUpdateSubscription(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	subscriptionID := r.PathValue("subscriptionId")
+	if subscriptionID == "" {
+		respondError(w, http.StatusBadRequest, "Subscription ID is required")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var input stripe.SubscriptionUpdateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate collection_method
+	if input.CollectionMethod != "" && input.CollectionMethod != "charge_automatically" && input.CollectionMethod != "send_invoice" {
+		respondError(w, http.StatusBadRequest, "collection_method must be 'charge_automatically' or 'send_invoice'")
+		return
+	}
+
+	subscription, err := client.UpdateSubscription(subscriptionID, input)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, subscription)
+}
+
+func (s *Server) handleStripeCancelSubscription(w http.ResponseWriter, r *http.Request) {
+	connectionID, err := strconv.ParseInt(r.PathValue("connectionId"), 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid connection ID")
+		return
+	}
+
+	subscriptionID := r.PathValue("subscriptionId")
+	if subscriptionID == "" {
+		respondError(w, http.StatusBadRequest, "Subscription ID is required")
+		return
+	}
+
+	client, err := s.getStripeClient(connectionID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var input struct {
+		CancelAtPeriodEnd bool `json:"cancel_at_period_end"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		// Default to immediate cancellation
+		input.CancelAtPeriodEnd = false
+	}
+
+	subscription, err := client.CancelSubscription(subscriptionID, input.CancelAtPeriodEnd)
+	if err != nil {
+		respondStripeAPIError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, subscription)
+}

@@ -1,4 +1,4 @@
-import { CreditCard, Plus, RefreshCw } from 'lucide-react'
+import { CreditCard, Plus, RefreshCw, Pencil } from 'lucide-react'
 import { createContainerNodeHandler, createLeafNodeHandler } from './BaseNode'
 import type { MenuItem, NodeContext, TreeNodeData } from './types'
 import type { Subscription } from '../../api'
@@ -31,6 +31,26 @@ export const SubscriptionsNode = createContainerNodeHandler({
 // Individual subscription node
 export const SubscriptionNode = createLeafNodeHandler({
   icon: (size) => <CreditCard size={size} />,
+
+  getTypeSpecificMenuItems: (context: NodeContext): MenuItem[] => {
+    const items: MenuItem[] = []
+    const { node, connectionId, platformType, editSubscription } = context
+
+    if (connectionId && node.data && editSubscription) {
+      const subscription = node.data as Subscription
+
+      // Edit subscription (Stripe only for now)
+      if (platformType === 'stripe') {
+        items.push({
+          label: 'Edit Subscription',
+          icon: <Pencil size={14} />,
+          action: () => editSubscription(connectionId, subscription.id, platformType),
+        })
+      }
+    }
+
+    return items
+  },
 
   getDisplayName: (node: TreeNodeData): string => {
     if (node.data) {

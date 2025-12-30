@@ -291,6 +291,19 @@ type CouponInput struct {
 	RedeemBy         int64   `json:"redeem_by,omitempty"`   // Unix timestamp
 }
 
+// SubscriptionUpdateInput is the input for updating a subscription
+// Maps to POST /v1/subscriptions/{id} - https://docs.stripe.com/api/subscriptions/update
+type SubscriptionUpdateInput struct {
+	CancelAtPeriodEnd    *bool             `json:"cancel_at_period_end,omitempty"`
+	CollectionMethod     string            `json:"collection_method,omitempty"`      // charge_automatically or send_invoice
+	DaysUntilDue         int               `json:"days_until_due,omitempty"`         // Required if collection_method=send_invoice
+	DefaultPaymentMethod string            `json:"default_payment_method,omitempty"` // Payment method ID
+	Description          string            `json:"description,omitempty"`
+	Coupon               string            `json:"coupon,omitempty"`             // Coupon code to apply (empty string to remove)
+	ProrationBehavior    string            `json:"proration_behavior,omitempty"` // create_prorations, none, always_invoice
+	Metadata             map[string]string `json:"metadata,omitempty"`
+}
+
 // APIError represents a Stripe API error
 type APIError struct {
 	StatusCode int
